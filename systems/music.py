@@ -74,21 +74,31 @@ def _mix_samples(*sample_lists):
 
 # Note frequencies (4th octave base)
 NOTE_FREQS = {
-    'C3': 130.81, 'D3': 146.83, 'E3': 164.81, 'F3': 174.61,
-    'G3': 196.00, 'A3': 220.00, 'Bb3': 233.08, 'B3': 246.94,
-    'C4': 261.63, 'D4': 293.66, 'E4': 329.63, 'F4': 349.23,
-    'G4': 392.00, 'A4': 440.00, 'Bb4': 466.16, 'B4': 493.88,
-    'C5': 523.25, 'D5': 587.33, 'E5': 659.26, 'F5': 698.46,
-    'G5': 783.99, 'A5': 880.00, 'Bb5': 932.33, 'B5': 987.77,
+    'C3': 130.81, 'Db3': 138.59, 'D3': 146.83, 'Eb3': 155.56,
+    'E3': 164.81, 'F3': 174.61, 'Gb3': 185.00, 'G3': 196.00,
+    'Ab3': 207.65, 'A3': 220.00, 'Bb3': 233.08, 'B3': 246.94,
+    'C4': 261.63, 'Db4': 277.18, 'D4': 293.66, 'Eb4': 311.13,
+    'E4': 329.63, 'F4': 349.23, 'Gb4': 369.99, 'G4': 392.00,
+    'Ab4': 415.30, 'A4': 440.00, 'Bb4': 466.16, 'B4': 493.88,
+    'C5': 523.25, 'Db5': 554.37, 'D5': 587.33, 'Eb5': 622.25,
+    'E5': 659.26, 'F5': 698.46, 'Gb5': 739.99, 'G5': 783.99,
+    'Ab5': 830.61, 'A5': 880.00, 'Bb5': 932.33, 'B5': 987.77,
     'R': 0,  # Rest
 }
+# Aliases for sharps
+NOTE_FREQS['C#3'] = NOTE_FREQS['Db3']
+NOTE_FREQS['F#3'] = NOTE_FREQS['Gb3']
+NOTE_FREQS['G#3'] = NOTE_FREQS['Ab3']
+NOTE_FREQS['C#4'] = NOTE_FREQS['Db4']
+NOTE_FREQS['F#4'] = NOTE_FREQS['Gb4']
+NOTE_FREQS['G#4'] = NOTE_FREQS['Ab4']
+NOTE_FREQS['C#5'] = NOTE_FREQS['Db5']
+NOTE_FREQS['F#5'] = NOTE_FREQS['Gb5']
+NOTE_FREQS['G#5'] = NOTE_FREQS['Ab5']
 
 
-def _render_melody(notes, wave="square", vol=0.2):
-    """Render a list of (note_name, duration_beats) at given BPM to samples.
-    Uses 130 BPM (funky tempo).
-    """
-    bpm = 130
+def _render_melody(notes, wave="square", vol=0.2, bpm=130):
+    """Render a list of (note_name, duration_beats) at given BPM to samples."""
     beat_dur = 60.0 / bpm
     all_samples = []
     for note, beats in notes:
@@ -102,9 +112,8 @@ def _render_melody(notes, wave="square", vol=0.2):
     return all_samples
 
 
-def _render_drums(pattern, beats):
+def _render_drums(pattern, beats, bpm=130):
     """Render a drum pattern. Pattern is list of (beat_position, drum_type)."""
-    bpm = 130
     beat_dur = 60.0 / bpm
     total_dur = beats * beat_dur
     total_samples = int(SAMPLE_RATE * total_dur)
@@ -145,87 +154,117 @@ def _render_drums(pattern, beats):
 
 
 def _build_town_music():
-    """Build the town theme — funky 8-bit groove with a party vibe.
+    """Build the town theme — chill boom bap groove at 100 BPM.
 
-    Original composition with a bouncy, swagger rhythm in the style of
-    classic 90s East Coast hip-hop but rendered as SNES chiptune.
-    Bb minor pentatonic scale, 130 BPM, heavy groove.
+    Chord progression: C# - A - F# - Ab (each chord = 2 bars = 8 beats).
+    32-beat loop total. Melody over C#/Db minor pentatonic.
     """
-    # === MELODY (lead — square wave) ===
-    # Funky, swaggering melody line — catchy and bouncy
-    melody_phrase_1 = [
-        ('Bb4', 0.5), ('R', 0.25), ('Bb4', 0.25), ('D5', 0.5), ('C5', 0.25),
-        ('Bb4', 0.5), ('G4', 0.25), ('R', 0.25), ('F4', 0.5), ('R', 0.25),
-        ('Bb4', 0.75), ('R', 0.25), ('G4', 0.5), ('F4', 0.25), ('D4', 0.5),
-        ('R', 0.25), ('F4', 0.75),
-    ]
-    melody_phrase_2 = [
-        ('Bb4', 0.25), ('D5', 0.25), ('F5', 0.5), ('D5', 0.25), ('C5', 0.5),
-        ('Bb4', 0.25), ('R', 0.25), ('G4', 0.5), ('Bb4', 0.25), ('C5', 0.5),
-        ('Bb4', 0.75), ('R', 0.25), ('G4', 0.25), ('F4', 0.25), ('G4', 0.5),
-        ('Bb4', 0.5), ('R', 0.5),
-    ]
-    # Repeat with variation
-    melody_phrase_3 = [
-        ('D5', 0.5), ('R', 0.25), ('C5', 0.25), ('Bb4', 0.5), ('G4', 0.5),
-        ('R', 0.25), ('F4', 0.25), ('G4', 0.5), ('Bb4', 0.75), ('R', 0.25),
-        ('C5', 0.5), ('D5', 0.25), ('C5', 0.25), ('Bb4', 0.5), ('R', 0.25),
-        ('G4', 0.75),
-    ]
-    melody_phrase_4 = [
-        ('F5', 0.5), ('D5', 0.25), ('C5', 0.25), ('D5', 0.5), ('R', 0.25),
-        ('Bb4', 0.5), ('G4', 0.25), ('Bb4', 0.5), ('C5', 0.25), ('R', 0.25),
-        ('Bb4', 0.75), ('G4', 0.25), ('F4', 0.25), ('R', 0.25),
-        ('Bb4', 1.0),
-    ]
+    bpm = 100
+    total_beats = 32  # 4 chords x 2 bars x 4 beats
 
-    full_melody = melody_phrase_1 + melody_phrase_2 + melody_phrase_3 + melody_phrase_4
-    melody_samples = _render_melody(full_melody, "square", 0.15)
-
-    # === BASSLINE (triangle wave — deep and funky) ===
-    bass_pattern = [
-        ('Bb3', 0.75), ('R', 0.25), ('Bb3', 0.25), ('Bb3', 0.25),
-        ('F3', 0.5), ('R', 0.25), ('G3', 0.75),
-        ('Bb3', 0.5), ('R', 0.25), ('G3', 0.25), ('F3', 0.5),
-        ('R', 0.25), ('Bb3', 0.25), ('Bb3', 0.75),
+    # === CHORD PAD (square wave, low duty for thin tone) ===
+    # C# maj: C#-F(E#)-G#  |  A maj: A-C#-E  |  F# maj: F#-Bb(A#)-C#  |  Ab maj: Ab-C-Eb
+    pad_notes = [
+        # C# chord - 8 beats
+        ('Db4', 2.0), ('F4', 2.0), ('Ab4', 2.0), ('Db4', 2.0),
+        # A chord - 8 beats
+        ('A3', 2.0), ('Db4', 2.0), ('E4', 2.0), ('A3', 2.0),
+        # F# chord - 8 beats
+        ('Gb4', 2.0), ('Bb4', 2.0), ('Db4', 2.0), ('Gb4', 2.0),
+        # Ab chord - 8 beats
+        ('Ab3', 2.0), ('C4', 2.0), ('Eb4', 2.0), ('Ab3', 2.0),
     ]
-    # Repeat bass to fill the full melody duration
-    bass_beats = sum(b for _, b in full_melody)
-    bass_unit_beats = sum(b for _, b in bass_pattern)
-    repeats = int(bass_beats / bass_unit_beats) + 1
-    full_bass = (bass_pattern * repeats)
-    bass_samples = _render_melody(full_bass, "triangle", 0.2)
+    pad_samples = _render_melody(pad_notes, "square", 0.08, bpm)
 
-    # Trim bass to match melody length
-    bass_samples = bass_samples[:len(melody_samples)]
-    if len(bass_samples) < len(melody_samples):
-        bass_samples.extend([0] * (len(melody_samples) - len(bass_samples)))
+    # === BASSLINE (triangle wave — deep and bouncy) ===
+    # Follows chord roots with rhythmic hits
+    bass = [
+        # C# bars (8 beats)
+        ('Db3', 0.75), ('R', 0.25), ('Db3', 0.5), ('R', 0.25), ('Db3', 0.25),
+        ('Ab3', 0.5), ('R', 0.5), ('Db3', 0.75), ('R', 0.25),
+        ('Db3', 0.5), ('R', 0.25), ('Ab3', 0.25), ('Db3', 0.5), ('R', 0.5),
+        ('Db3', 0.75), ('R', 0.25), ('Ab3', 0.5), ('R', 0.5),
+        # A bars (8 beats)
+        ('A3', 0.75), ('R', 0.25), ('A3', 0.5), ('R', 0.25), ('A3', 0.25),
+        ('E3', 0.5), ('R', 0.5), ('A3', 0.75), ('R', 0.25),
+        ('A3', 0.5), ('R', 0.25), ('E3', 0.25), ('A3', 0.5), ('R', 0.5),
+        ('A3', 0.75), ('R', 0.25), ('E3', 0.5), ('R', 0.5),
+        # F# bars (8 beats)
+        ('Gb3', 0.75), ('R', 0.25), ('Gb3', 0.5), ('R', 0.25), ('Gb3', 0.25),
+        ('Db3', 0.5), ('R', 0.5), ('Gb3', 0.75), ('R', 0.25),
+        ('Gb3', 0.5), ('R', 0.25), ('Db3', 0.25), ('Gb3', 0.5), ('R', 0.5),
+        ('Gb3', 0.75), ('R', 0.25), ('Db3', 0.5), ('R', 0.5),
+        # Ab bars (8 beats)
+        ('Ab3', 0.75), ('R', 0.25), ('Ab3', 0.5), ('R', 0.25), ('Ab3', 0.25),
+        ('Eb3', 0.5), ('R', 0.5), ('Ab3', 0.75), ('R', 0.25),
+        ('Ab3', 0.5), ('R', 0.25), ('Eb3', 0.25), ('Ab3', 0.5), ('R', 0.5),
+        ('Ab3', 0.75), ('R', 0.25), ('Eb3', 0.5), ('R', 0.5),
+    ]
+    bass_samples = _render_melody(bass, "triangle", 0.22, bpm)
 
-    # === DRUMS (kick-snare-hat pattern — boom bap groove) ===
-    # Classic boom-bap: kick on 1, 1.75, snare on 2, 4, hats on every 0.5
+    # === MELODY (square wave lead — Db minor pentatonic: Db Fb(E) Gb Ab Cb(B)) ===
+    melody = [
+        # Over C# — opening phrase (8 beats)
+        ('Db5', 0.5), ('R', 0.25), ('B4', 0.25), ('Ab4', 0.5), ('R', 0.25),
+        ('Gb4', 0.75), ('Ab4', 0.5), ('Db5', 0.5), ('R', 0.5),
+        ('B4', 0.5), ('Ab4', 0.25), ('Gb4', 0.5), ('R', 0.25),
+        ('Ab4', 0.75), ('R', 0.25), ('Gb4', 0.5), ('R', 0.25),
+        ('Db5', 0.5), ('R', 0.5),
+        # Over A — descending answer (8 beats)
+        ('E4', 0.5), ('R', 0.25), ('Db4', 0.25), ('E4', 0.5), ('Gb4', 0.5),
+        ('R', 0.25), ('Ab4', 0.75), ('Gb4', 0.5), ('E4', 0.25),
+        ('Db4', 0.5), ('R', 0.25), ('E4', 0.75), ('R', 0.25),
+        ('Db4', 0.5), ('R', 0.25), ('E4', 0.5), ('R', 0.25),
+        ('Db4', 0.5), ('R', 0.5),
+        # Over F# — rising energy (8 beats)
+        ('Gb4', 0.5), ('Ab4', 0.25), ('B4', 0.5), ('R', 0.25),
+        ('Db5', 0.75), ('B4', 0.5), ('Ab4', 0.25), ('Gb4', 0.5),
+        ('R', 0.25), ('Ab4', 0.5), ('B4', 0.25), ('Db5', 0.5),
+        ('R', 0.25), ('B4', 0.75), ('R', 0.25), ('Ab4', 0.5),
+        ('Gb4', 0.5), ('R', 0.5),
+        # Over Ab — resolving phrase (8 beats)
+        ('Ab4', 0.5), ('R', 0.25), ('Gb4', 0.25), ('E4', 0.5), ('Gb4', 0.5),
+        ('R', 0.25), ('Ab4', 0.75), ('Db5', 0.5), ('B4', 0.25),
+        ('Ab4', 0.5), ('R', 0.25), ('Gb4', 0.5), ('R', 0.25),
+        ('Db4', 0.5), ('R', 0.25), ('Db4', 1.0),
+        ('R', 0.5), ('Db4', 0.5),
+    ]
+    melody_samples = _render_melody(melody, "square", 0.14, bpm)
+
+    # Pad all tracks to same length
+    target_len = int(SAMPLE_RATE * total_beats * 60.0 / bpm)
+    for samples in [pad_samples, bass_samples, melody_samples]:
+        if len(samples) < target_len:
+            samples.extend([0] * (target_len - len(samples)))
+    pad_samples = pad_samples[:target_len]
+    bass_samples = bass_samples[:target_len]
+    melody_samples = melody_samples[:target_len]
+
+    # === DRUMS (boom bap — kick on 1 and the "and" of 2, snare on 2 and 4) ===
     drum_pattern_one_bar = []
-    for i in range(8):  # 8 hi-hat hits per 4 beats
+    # Hi-hats on eighth notes
+    for i in range(8):
         drum_pattern_one_bar.append((i * 0.5, "hat"))
+    # Boom bap kick/snare
     drum_pattern_one_bar.extend([
         (0, "kick"), (1.5, "kick"), (2.75, "kick"),
         (1, "snare"), (3, "snare"),
     ])
 
-    total_beats = bass_beats
     full_drums = []
     bar_offset = 0
     while bar_offset < total_beats:
         for beat_pos, drum in drum_pattern_one_bar:
             full_drums.append((bar_offset + beat_pos, drum))
-        bar_offset += 4  # 4 beats per bar
+        bar_offset += 4
 
-    drum_samples = _render_drums(full_drums, total_beats)
-    drum_samples = drum_samples[:len(melody_samples)]
-    if len(drum_samples) < len(melody_samples):
-        drum_samples.extend([0] * (len(melody_samples) - len(drum_samples)))
+    drum_samples = _render_drums(full_drums, total_beats, bpm)
+    drum_samples = drum_samples[:target_len]
+    if len(drum_samples) < target_len:
+        drum_samples.extend([0] * (target_len - len(drum_samples)))
 
     # === MIX ===
-    mixed = _mix_samples(melody_samples, bass_samples, drum_samples)
+    mixed = _mix_samples(melody_samples, bass_samples, pad_samples, drum_samples)
     return _samples_to_sound(mixed)
 
 
