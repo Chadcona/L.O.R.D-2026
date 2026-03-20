@@ -1,0 +1,10 @@
+[project]
+name = "lord-rpg"
+version = "1.0.0"
+description = "Legend of the Red Dragon: 16-Bit JRPG Edition"
+requires-python = ">=3.9"
+dependencies = ["pygame>=2.0"]
+
+[tool.pyright]
+pythonVersion = "3.11"
+extraPaths = ["."]
