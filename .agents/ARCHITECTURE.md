@@ -42,7 +42,11 @@ SceneManager handles transitions with optional fade effects:
 - Procedural chiptune generated from note sequences at runtime
 - Wave types: square, triangle, sawtooth, sine, noise
 - Drum synthesis: kick (sine sweep), snare (noise burst), hi-hat
-- MusicManager: lazily builds tracks, loops playback per scene
+- Full chromatic note frequency table (C3-B5 with all sharps/flats)
+- BPM parameterized per track (town = 100 BPM, others = 130 BPM)
+- Town theme: C#-A-F#-Ab chord progression with boom bap drums
+- MusicManager: quits pre-existing mixer to force correct sample rate (22050 Hz), lazily builds tracks, loops playback per scene
+- Scene-to-track mapping in main.py via dict lookup with fallback stop
 
 ## Town (`scenes/town.py`)
 - 20x15 tile map at 16x16 pixels per tile

@@ -366,6 +366,11 @@ class MusicManager:
 
     def __init__(self):
         try:
+            # Quit any mixer already started by pygame.init() so we can
+            # reinitialise at our exact sample rate.  Without this the
+            # mixer may stay at 44100 Hz while we generate at 22050,
+            # causing 2x playback speed.
+            pygame.mixer.quit()
             pygame.mixer.init(frequency=SAMPLE_RATE, size=-16, channels=CHANNELS, buffer=2048)
         except pygame.error:
             self._enabled = False

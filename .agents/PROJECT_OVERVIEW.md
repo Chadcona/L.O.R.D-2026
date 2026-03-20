@@ -9,13 +9,14 @@ A single-player SNES-style JRPG built with Python + Pygame, based on the classic
 - **Platform**: Cross-platform (developed on macOS ARM)
 - **Assets**: All sprites, tiles, and music are procedurally generated at runtime (no external asset files)
 
-## Virtual Resolution
-- 320x240 virtual canvas, upscaled to display size
-- Supports fullscreen via F11 or Alt+Enter using `pygame.FULLSCREEN | pygame.SCALED`
+## Display
+- 320x240 virtual canvas, upscaled with aspect-ratio-correct scaling (letterboxed)
+- Default window: 1920x1080, resizable via `pygame.RESIZABLE`
+- Fullscreen via F11 or Alt+Enter using `pygame.FULLSCREEN | pygame.SCALED`
 
 ## Project Structure
 ```
-main.py              - Game entry point, loop, fullscreen toggle, music hookup
+main.py              - Game entry point, loop, fullscreen toggle, resizable window, music hookup
 settings.py          - All constants: colors, screen size, level tables, paths
 pyproject.toml       - Project metadata and Pyright config
 

@@ -12,6 +12,7 @@ Every sprite, tile, and music track is procedurally generated at runtime — no 
 - Smooth pixel-by-pixel movement with walk animation at 64px/s
 - Atmospheric effects: fog particles, fireflies, chimney smoke, flickering lanterns
 - Parallax starfield title screen with animated dragon sprite
+- 1080p resizable window with aspect-ratio-correct scaling (letterboxed)
 - Fullscreen support (F11 or Alt+Enter)
 
 ### Combat
@@ -38,12 +39,14 @@ Every sprite, tile, and music track is procedurally generated at runtime — no 
 ### Music
 - Procedurally generated chiptune soundtrack
 - Unique themes for title screen, town, forest, and battle
-- Funky boom-bap town groove with square wave melody and triangle bass
+- Town groove: C#-A-F#-Ab chord progression at 100 BPM with boom bap drums
+- Full chromatic note support with parameterized BPM per track
 - All music synthesized at runtime from note sequences
 
 ### Technical
 - Python 3.11+ / Pygame 2.6+
-- 320x240 virtual resolution upscaled to display
+- 320x240 virtual resolution upscaled to 1080p with aspect-ratio letterboxing
+- Resizable window — drag to any size
 - Zero external asset dependencies
 - JSON save/load system
 - Scene manager with fade transitions

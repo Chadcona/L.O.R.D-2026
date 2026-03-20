@@ -33,3 +33,5 @@
 - `switch_to()` does a fade transition (needs multiple update cycles); use `switch_immediate()` for tests
 - Enemy turn in battle is triggered by animation chain callbacks, NOT by USEREVENT timer
 - Left-facing sprites are horizontally flipped right-facing sprites
+- `pygame.init()` pre-initializes mixer at 44100 Hz — MusicManager must `pygame.mixer.quit()` first then reinit at 22050 Hz, otherwise samples play at 2x speed
+- Music scene mapping uses a dict in main.py — add new scenes there or they get `music.stop()`
