@@ -54,7 +54,17 @@ def _generate_wave(freq, duration, wave_type="square", volume=0.3, duty=0.5):
 
 def _samples_to_sound(samples):
     """Convert a list of 16-bit samples to a pygame Sound object."""
-    raw = array.array('h', samples)
+    # The mixer may run in stereo even if we request mono, so duplicate
+    # each sample into left+right channels to ensure correct playback speed.
+    freq, fmt, channels = pygame.mixer.get_init()
+    if channels == 2:
+        stereo = array.array('h')
+        for s in samples:
+            stereo.append(s)
+            stereo.append(s)
+        raw = stereo
+    else:
+        raw = array.array('h', samples)
     sound = pygame.mixer.Sound(buffer=raw)
     return sound
 
