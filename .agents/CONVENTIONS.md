@@ -3,7 +3,7 @@
 ## General
 - Python 3.11+, no type annotations (Pyright gives false positives on pygame/dict code)
 - Pygame 2.6+ as sole dependency
-- All assets procedurally generated — no external files to load
+- External sprite sheet for characters, procedural generation for everything else
 - `pyproject.toml` has `extraPaths = ["."]` for IDE module resolution
 
 ## Naming
@@ -20,18 +20,20 @@
 - Lazy initialization: sprites cached on first access, music built on first play
 - Local imports inside methods for optional dependencies (e.g., `from systems.inventory import ...`)
 
-## Pixel Art
-- Virtual resolution: 320x240 (SNES standard)
-- Player sprites: 16x24 pixels
-- Enemy sprites: 48x48 pixels
-- Tiles: 16x16 pixels
-- Color palette: SNES-style with highlight/mid/shadow per material
-- `_px(surface, x, y, color)` helper for bounds-checked pixel placement
+## Display & Sprites
+- Native resolution: 1920×1080 (virtual = screen, no upscaling)
+- Player sprites: 80×120 pixels (overworld), 192×288 (battle)
+- Enemy sprites: 288×288 pixels (battle)
+- Tiles: 96×96 pixels (town), procedural 16×16 scaled up at render
+- Sprite sheet: `assets/sprites/characters.png` (2816×1536), regions defined in `SPRITE_SHEET_REGIONS`
+- Colorkey: `(255, 250, 219)` for cream background transparency
+- Font sizes: SM=24, MD=36, LG=48, XL=72, TITLE=96
 
 ## Common Gotchas
-- IDE diagnostics are almost all false positives — the type checker can't handle pygame's untyped dict values or module resolution without virtualenv
+- IDE diagnostics are almost all false positives — the type checker can't handle pygame's untyped dict values
 - `switch_to()` does a fade transition (needs multiple update cycles); use `switch_immediate()` for tests
 - Enemy turn in battle is triggered by animation chain callbacks, NOT by USEREVENT timer
 - Left-facing sprites are horizontally flipped right-facing sprites
 - `pygame.init()` pre-initializes mixer at 44100 Hz — MusicManager must `pygame.mixer.quit()` first then reinit at 22050 Hz, otherwise samples play at 2x speed
-- Music scene mapping uses a dict in main.py — add new scenes there or they get `music.stop()`
+- Town map is 1920×1440 (larger than viewport) — camera scrolls to follow player
+- Procedural tiles are generated at 16×16 and scaled to TILE_SIZE (96) at render time

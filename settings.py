@@ -3,15 +3,6 @@
 
 import os
 
-# Display
-VIRTUAL_WIDTH = 320
-VIRTUAL_HEIGHT = 240
-SCREEN_WIDTH = 1920
-SCREEN_HEIGHT = 1080
-SCALE_FACTOR = SCREEN_WIDTH // VIRTUAL_WIDTH
-FPS = 60
-TITLE = "Legend of the Red Dragon: 16-Bit Edition"
-
 # Paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ASSETS_DIR = os.path.join(BASE_DIR, "assets")
@@ -21,6 +12,55 @@ UI_DIR = os.path.join(ASSETS_DIR, "ui")
 MUSIC_DIR = os.path.join(ASSETS_DIR, "music")
 SFX_DIR = os.path.join(ASSETS_DIR, "sfx")
 SAVES_DIR = os.path.join(BASE_DIR, "saves")
+
+# Display — native 1080p rendering (no virtual screen scaling)
+VIRTUAL_WIDTH = 1920
+VIRTUAL_HEIGHT = 1080
+SCREEN_WIDTH = 1920
+SCREEN_HEIGHT = 1080
+SCALE_FACTOR = 1
+FPS = 60
+TITLE = "Legend of the Red Dragon: 16-Bit Edition"
+
+# External sprite sheet
+USE_EXTERNAL_SPRITES = True
+SPRITE_SHEET_PATH = os.path.join(SPRITES_DIR, "characters.png")
+
+# Sprite sizes (for display — extracted from sheet at full res, then scaled)
+PLAYER_SPRITE_W = 80
+PLAYER_SPRITE_H = 120
+BATTLE_SPRITE_W = 192
+BATTLE_SPRITE_H = 288
+ENEMY_SPRITE_SIZE = 288
+
+# Sprite sheet regions: (x, y, w, h) for each class and facing
+# Detected from the 2816x1536 characters.png layout
+# Each class has 3 poses: front (down), side (right), back (up); left = flipped right
+SPRITE_SHEET_REGIONS = {
+    "Warrior": {  # Row 0, left group
+        "down":  (70, 60, 310, 360),
+        "right": (500, 60, 320, 350),
+        "up":    (950, 60, 350, 350),
+    },
+    "Thief": {  # Row 1, left group (labeled "Rogue" on sheet)
+        "down":  (70, 460, 310, 330),
+        "right": (500, 460, 320, 302),
+        "up":    (950, 460, 350, 302),
+    },
+    "Cleric": {  # Row 0, right group
+        "down":  (1500, 60, 320, 360),
+        "right": (1980, 60, 270, 350),
+        "up":    (2400, 60, 320, 350),
+    },
+    "Mage": {  # Row 3, left group
+        "down":  (70, 1170, 310, 360),
+        "right": (500, 1170, 320, 360),
+        "up":    (950, 1170, 350, 360),
+    },
+}
+
+# Tile size (town map)
+TILE_SIZE = 96
 
 # 16-bit SNES colour palette
 BLACK = (0, 0, 0)
@@ -83,9 +123,9 @@ LEVEL_EXP = {
 SERVER_URL = "http://localhost:8000"
 NETWORK_TIMEOUT = 5
 
-# Font sizes (virtual resolution)
-FONT_SM = 8
-FONT_MD = 12
-FONT_LG = 16
-FONT_XL = 24
-FONT_TITLE = 32
+# Font sizes (1080p resolution)
+FONT_SM = 24
+FONT_MD = 36
+FONT_LG = 48
+FONT_XL = 72
+FONT_TITLE = 96

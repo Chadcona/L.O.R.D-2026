@@ -20,11 +20,9 @@ def main():
     pygame.init()
     pygame.display.set_caption(TITLE)
 
-    # Start windowed and resizable; track fullscreen state
+    # Start windowed; track fullscreen state
     fullscreen = False
-    screen = pygame.display.set_mode(
-        (SCREEN_WIDTH, SCREEN_HEIGHT), pygame.RESIZABLE
-    )
+    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     virtual_screen = pygame.Surface((VIRTUAL_WIDTH, VIRTUAL_HEIGHT))
     clock = pygame.time.Clock()
 
@@ -58,12 +56,7 @@ def main():
 
             # Fullscreen toggle: F11 or Alt+Enter
             if event.type == pygame.KEYDOWN:
-                toggle_fs = False
                 if event.key == pygame.K_F11:
-                    toggle_fs = True
-                elif event.key == pygame.K_RETURN and (event.mod & pygame.KMOD_ALT):
-                    toggle_fs = True
-                if toggle_fs:
                     fullscreen = not fullscreen
                     if fullscreen:
                         screen = pygame.display.set_mode(
@@ -71,7 +64,18 @@ def main():
                         )
                     else:
                         screen = pygame.display.set_mode(
-                            (SCREEN_WIDTH, SCREEN_HEIGHT), pygame.RESIZABLE
+                            (SCREEN_WIDTH, SCREEN_HEIGHT)
+                        )
+                    continue
+                elif event.key == pygame.K_RETURN and (event.mod & pygame.KMOD_ALT):
+                    fullscreen = not fullscreen
+                    if fullscreen:
+                        screen = pygame.display.set_mode(
+                            (0, 0), pygame.FULLSCREEN | pygame.SCALED
+                        )
+                    else:
+                        screen = pygame.display.set_mode(
+                            (SCREEN_WIDTH, SCREEN_HEIGHT)
                         )
                     continue
 
@@ -90,19 +94,14 @@ def main():
         # Update music based on current scene
         cur_scene = manager.current_scene
         if cur_scene != prev_scene:
-            scene_music = {
-                "title": "title",
-                "char_create": "title",
-                "load_game": "title",
-                "town": "town",
-                "forest": "forest",
-                "battle": "battle",
-            }
-            track = scene_music.get(cur_scene)
-            if track:
-                music.play(track)
-            else:
-                music.stop()
+            if cur_scene == "title":
+                music.play("title")
+            elif cur_scene == "town":
+                music.play("town")
+            elif cur_scene in ("forest",):
+                music.play("forest")
+            elif cur_scene == "battle":
+                music.play("battle")
             prev_scene = cur_scene
 
         # Update
@@ -112,17 +111,10 @@ def main():
         virtual_screen.fill(BLACK)
         manager.draw(virtual_screen)
 
-        # Scale virtual screen to actual display with aspect ratio preservation
-        screen.fill(BLACK)
-        display_w, display_h = screen.get_size()
-        # Calculate largest integer or fractional scale that fits
-        scale = min(display_w / VIRTUAL_WIDTH, display_h / VIRTUAL_HEIGHT)
-        scaled_w = int(VIRTUAL_WIDTH * scale)
-        scaled_h = int(VIRTUAL_HEIGHT * scale)
-        offset_x = (display_w - scaled_w) // 2
-        offset_y = (display_h - scaled_h) // 2
-        scaled = pygame.transform.scale(virtual_screen, (scaled_w, scaled_h))
-        screen.blit(scaled, (offset_x, offset_y))
+        # Scale virtual screen to actual display
+        display_size = screen.get_size()
+        scaled = pygame.transform.scale(virtual_screen, display_size)
+        screen.blit(scaled, (0, 0))
 
         pygame.display.flip()
 

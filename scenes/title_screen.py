@@ -1,5 +1,5 @@
 # Title Screen — Legend of the Red Dragon: 16-Bit Edition
-# SNES-quality title with detailed dragon, parallax stars, and atmospheric effects
+# 1080p title with detailed dragon, parallax stars, and atmospheric effects
 
 import pygame
 import math
@@ -12,8 +12,8 @@ from settings import (
 
 
 def _create_title_dragon():
-    """Create a detailed dragon sprite for the title screen (64x48)."""
-    W, H = 80, 56
+    """Create a detailed dragon sprite for the title screen (480x336 — 6x upscale)."""
+    W, H = 480, 336
     surf = pygame.Surface((W, H), pygame.SRCALPHA)
 
     body = (160, 30, 20)
@@ -27,8 +27,12 @@ def _create_title_dragon():
     eye_color = (255, 200, 0)
 
     def px(x, y, c):
-        if 0 <= x < W and 0 <= y < H:
-            surf.set_at((x, y), c)
+        # Draw a 6x6 block for each "pixel" to match 1080p scale
+        for dy in range(6):
+            for dx in range(6):
+                nx, ny = x * 6 + dx, y * 6 + dy
+                if 0 <= nx < W and 0 <= ny < H:
+                    surf.set_at((nx, ny), c)
 
     # Body (large oval)
     cx, cy = 40, 32
@@ -44,7 +48,7 @@ def _create_title_dragon():
                 else:
                     px(cx + x, cy + y, body)
 
-    # Belly scales (lighter stripe)
+    # Belly scales
     for y in range(cy - 4, cy + 8):
         for x in range(cx - 6, cx + 7):
             if (x + y) % 3 == 0:
@@ -73,7 +77,7 @@ def _create_title_dragon():
                 else:
                     px(hx + x, hy + y, body)
 
-    # Jaw / snout extension
+    # Jaw / snout
     for x in range(hx + 4, hx + 16):
         for y in range(hy - 2, hy + 4):
             if y == hy - 2 or y == hy + 3:
@@ -82,7 +86,6 @@ def _create_title_dragon():
                 px(x, y, body_hi)
             else:
                 px(x, y, body)
-    # Nostril
     px(hx + 14, hy - 1, (255, 120, 40))
     px(hx + 14, hy, (255, 120, 40))
 
@@ -92,14 +95,14 @@ def _create_title_dragon():
         px(tx, hy + 4, (255, 255, 240))
         px(tx, hy + 5, (240, 240, 220))
 
-    # Eyes (glowing)
+    # Eyes
     for dy in range(-2, 3):
         for dx in range(-2, 3):
             if dx * dx + dy * dy <= 4:
                 px(hx + 2 + dx, hy - 2 + dy, (255, 255, 200))
     px(hx + 2, hy - 2, eye_color)
     px(hx + 3, hy - 2, eye_color)
-    px(hx + 2, hy - 1, (200, 50, 0))  # Pupil slit
+    px(hx + 2, hy - 1, (200, 50, 0))
 
     # Horns
     for i in range(8):
@@ -107,25 +110,21 @@ def _create_title_dragon():
         px(hx - 3 + i // 2, hy - 6 - i, (170, 150, 110))
         px(hx + 4 + i // 3, hy - 6 - i, horn)
 
-    # Wings (large, spread)
-    # Left wing
+    # Wings (left)
     for i in range(22):
         t = i / 22
         wy_base = cy - 8 - int(t * 18)
         wx = cx - 8 - i
-        # Wing bone
         px(wx, wy_base, wing_bone)
         px(wx, wy_base + 1, wing_bone)
-        # Wing membrane
         membrane_h = int((1 - t) * 14) + 2
         for dy in range(2, membrane_h):
             alpha = max(80, 255 - dy * 12)
             mc = (wing_membrane[0], wing_membrane[1], wing_membrane[2], alpha)
             px(wx, wy_base + dy, mc)
-        # Membrane edge
         px(wx, wy_base + membrane_h, outline)
 
-    # Right wing (partially behind)
+    # Wings (right)
     for i in range(16):
         t = i / 16
         wy_base = cy - 10 - int(t * 14)
@@ -137,7 +136,7 @@ def _create_title_dragon():
             mc = (wing_membrane[0] - 20, wing_membrane[1] - 5, wing_membrane[2] - 5, alpha)
             px(wx, wy_base + dy, mc)
 
-    # Tail (curving down and left)
+    # Tail
     for i in range(20):
         t = i / 20
         tx = cx - 16 - i
@@ -150,7 +149,6 @@ def _create_title_dragon():
                 px(tx, ty + dy, body_hi)
             else:
                 px(tx, ty + dy, body_dk)
-    # Tail spike
     for i in range(4):
         px(cx - 36 - i, cy + 8 - i, horn)
         px(cx - 36 - i, cy + 8 + i, horn)
@@ -160,14 +158,13 @@ def _create_title_dragon():
         for y in range(cy + 10, cy + 20):
             for dx in range(4):
                 if y == cy + 19:
-                    px(leg_x + dx, y, outline)  # Claws
+                    px(leg_x + dx, y, outline)
                 elif dx == 0 or dx == 3:
                     px(leg_x + dx, y, outline)
                 elif dx == 1:
                     px(leg_x + dx, y, body)
                 else:
                     px(leg_x + dx, y, body_dk)
-        # Claws
         for i in range(3):
             px(leg_x - 1 + i * 2, cy + 20, horn)
 
@@ -175,7 +172,7 @@ def _create_title_dragon():
 
 
 class TitleScreen(Scene):
-    """SNES-quality title screen with detailed dragon and atmospheric effects."""
+    """1080p title screen with detailed dragon and atmospheric effects."""
 
     def __init__(self):
         super().__init__()
@@ -185,12 +182,12 @@ class TitleScreen(Scene):
                 {"label": "Continue", "value": "continue"},
                 {"label": "Quit", "value": "quit"},
             ],
-            x=VIRTUAL_WIDTH // 2 - 40,
-            y=170,
-            spacing=18,
-            font_size=16,
+            x=VIRTUAL_WIDTH // 2 - 120,
+            y=750,
+            spacing=60,
+            font_size=48,
             show_box=True,
-            box_padding=10,
+            box_padding=30,
         )
         self.time = 0
         self.stars = []
@@ -202,19 +199,19 @@ class TitleScreen(Scene):
         """Create background starfield and cloud layers."""
         import random
         random.seed(42)
-        for _ in range(80):
+        for _ in range(120):
             self.stars.append({
                 "x": random.randint(0, VIRTUAL_WIDTH),
-                "y": random.randint(0, VIRTUAL_HEIGHT // 2 + 20),
+                "y": random.randint(0, VIRTUAL_HEIGHT // 2 + 100),
                 "brightness": random.randint(100, 255),
                 "speed": random.uniform(0.2, 0.8),
                 "size": 1 if random.random() > 0.15 else 2,
             })
-        for _ in range(6):
+        for _ in range(8):
             self.clouds.append({
-                "x": random.randint(-40, VIRTUAL_WIDTH),
-                "y": random.randint(20, 80),
-                "width": random.randint(30, 60),
+                "x": random.randint(-100, VIRTUAL_WIDTH),
+                "y": random.randint(100, 400),
+                "width": random.randint(150, 350),
                 "speed": random.uniform(3, 8),
                 "alpha": random.randint(15, 35),
             })
@@ -230,7 +227,7 @@ class TitleScreen(Scene):
 
         for star in self.stars:
             star["y"] += star["speed"] * dt * 8
-            if star["y"] > VIRTUAL_HEIGHT // 2 + 20:
+            if star["y"] > VIRTUAL_HEIGHT // 2 + 100:
                 star["y"] = 0
                 import random
                 star["x"] = random.randint(0, VIRTUAL_WIDTH)
@@ -253,7 +250,7 @@ class TitleScreen(Scene):
                 pygame.event.post(pygame.event.Event(pygame.QUIT))
 
     def draw(self, surface):
-        # Background gradient (dark sky with warm horizon)
+        # Background gradient
         for y in range(VIRTUAL_HEIGHT):
             t = y / VIRTUAL_HEIGHT
             if t < 0.4:
@@ -272,94 +269,88 @@ class TitleScreen(Scene):
                 b = int(26 - 15 * gt)
             pygame.draw.line(surface, (r, g, b), (0, y), (VIRTUAL_WIDTH, y))
 
-        # Stars with twinkling
+        # Stars
         for star in self.stars:
-            pulse = abs(math.sin(self.time * 1.5 + star["x"] * 0.1)) * 0.4 + 0.6
+            pulse = abs(math.sin(self.time * 1.5 + star["x"] * 0.02)) * 0.4 + 0.6
             bright = int(star["brightness"] * pulse)
             color = (bright, bright, min(255, bright + 20))
-            if star["size"] == 1:
-                surface.set_at((int(star["x"]), int(star["y"])), color)
-            else:
-                pygame.draw.circle(surface, color, (int(star["x"]), int(star["y"])), 1)
+            size = star["size"] + 1
+            pygame.draw.circle(surface, color, (int(star["x"]), int(star["y"])), size)
 
-        # Wispy clouds
+        # Clouds
         for cloud in self.clouds:
-            cloud_surf = pygame.Surface((cloud["width"], 8), pygame.SRCALPHA)
+            cloud_surf = pygame.Surface((cloud["width"], 40), pygame.SRCALPHA)
             for cx in range(cloud["width"]):
-                ch = int(4 * math.sin(cx / cloud["width"] * math.pi))
-                for cy in range(max(1, 4 - ch), 4 + ch):
-                    alpha = cloud["alpha"] - abs(cx - cloud["width"] // 2) // 2
+                ch = int(20 * math.sin(cx / cloud["width"] * math.pi))
+                for cy in range(max(1, 20 - ch), 20 + ch):
+                    alpha = cloud["alpha"] - abs(cx - cloud["width"] // 2) // 6
                     if alpha > 0:
                         cloud_surf.set_at((cx, cy), (180, 160, 200, alpha))
             surface.blit(cloud_surf, (int(cloud["x"]), cloud["y"]))
 
         # Mountain silhouettes
         for x in range(VIRTUAL_WIDTH):
-            my = 95 + int(12 * math.sin(x * 0.015) + 6 * math.sin(x * 0.04))
-            for y in range(my, 110):
-                t = (y - my) / max(1, 110 - my)
+            my = 480 + int(60 * math.sin(x * 0.003) + 30 * math.sin(x * 0.008))
+            for y in range(my, 560):
+                t = (y - my) / max(1, 560 - my)
                 mc = (int(15 + 12 * t), int(8 + 10 * t), int(25 + 15 * t))
                 surface.set_at((x, y), mc)
 
-        # Dragon sprite (centered, with gentle bob)
+        # Dragon
         if self.dragon_sprite:
-            bob_y = int(math.sin(self.time * 1.2) * 3)
+            bob_y = int(math.sin(self.time * 1.2) * 12)
             dragon_x = VIRTUAL_WIDTH // 2 - self.dragon_sprite.get_width() // 2
-            dragon_y = 52 + bob_y
+            dragon_y = 250 + bob_y
 
-            # Dragon fire glow (under dragon)
             glow_intensity = int(30 + 20 * math.sin(self.time * 4))
-            glow_surf = pygame.Surface((60, 20), pygame.SRCALPHA)
-            pygame.draw.ellipse(glow_surf, (255, 100, 0, glow_intensity), (0, 0, 60, 20))
-            surface.blit(glow_surf, (dragon_x + 10, dragon_y + 40))
+            glow_surf = pygame.Surface((360, 100), pygame.SRCALPHA)
+            pygame.draw.ellipse(glow_surf, (255, 100, 0, glow_intensity), (0, 0, 360, 100))
+            surface.blit(glow_surf, (dragon_x + 60, dragon_y + 240))
 
             surface.blit(self.dragon_sprite, (dragon_x, dragon_y))
 
-            # Flame breath particles
-            flame_x = dragon_x + 68
-            flame_y = dragon_y + 10
-            for i in range(8):
-                fx = flame_x + i * 3 + int(math.sin(self.time * 10 + i) * 2)
-                fy = flame_y + int(math.sin(self.time * 8 + i * 0.5) * 3)
-                r = max(0, 255 - i * 20)
-                g = max(0, 150 - i * 18)
+            # Flame breath
+            flame_x = dragon_x + 408
+            flame_y = dragon_y + 60
+            for i in range(12):
+                fx = flame_x + i * 12 + int(math.sin(self.time * 10 + i) * 8)
+                fy = flame_y + int(math.sin(self.time * 8 + i * 0.5) * 12)
+                r = max(0, 255 - i * 18)
+                g = max(0, 150 - i * 12)
                 b = 0
-                alpha = max(0, 255 - i * 30)
+                alpha = max(0, 255 - i * 20)
                 if alpha > 0:
-                    ps = pygame.Surface((3, 3), pygame.SRCALPHA)
-                    pygame.draw.circle(ps, (r, g, b, alpha), (1, 1), 1)
+                    ps = pygame.Surface((12, 12), pygame.SRCALPHA)
+                    pygame.draw.circle(ps, (r, g, b, alpha), (6, 6), 5)
                     surface.blit(ps, (fx, fy))
 
         # Title text
-        title_y = 20
+        title_y = 80
 
-        # "LEGEND OF THE" — elegant subtitle
         draw_text(surface, "L E G E N D   O F   T H E", VIRTUAL_WIDTH // 2, title_y,
-                  (200, 190, 170), 12, center=True)
+                  (200, 190, 170), 36, center=True)
 
-        # "RED DRAGON" — pulsing red-gold
         r = int(200 + 55 * math.sin(self.time * 2))
         g = int(50 + 40 * math.sin(self.time * 2 + 1))
         b = int(20 + 20 * math.sin(self.time * 2 + 2))
         title_color = (min(255, r), min(255, g), min(255, b))
 
-        # Title shadow
-        draw_text(surface, "RED DRAGON", VIRTUAL_WIDTH // 2 + 1, title_y + 15,
-                  (40, 10, 5), 32, center=True, shadow=False)
-        draw_text(surface, "RED DRAGON", VIRTUAL_WIDTH // 2, title_y + 14,
-                  title_color, 32, center=True, shadow=False)
+        draw_text(surface, "RED DRAGON", VIRTUAL_WIDTH // 2 + 3, title_y + 60,
+                  (40, 10, 5), 96, center=True, shadow=False)
+        draw_text(surface, "RED DRAGON", VIRTUAL_WIDTH // 2, title_y + 57,
+                  title_color, 96, center=True, shadow=False)
 
-        # Subtitle
-        draw_text(surface, "~ 16-Bit Edition ~", VIRTUAL_WIDTH // 2, title_y + 38,
-                  GOLD, 12, center=True)
+        draw_text(surface, "~ 16-Bit Edition ~", VIRTUAL_WIDTH // 2, title_y + 150,
+                  GOLD, 36, center=True)
 
-        # Decorative line under subtitle
-        line_y = title_y + 48
-        line_w = 80
+        # Decorative line
+        line_y = title_y + 185
+        line_w = 400
         for x in range(VIRTUAL_WIDTH // 2 - line_w, VIRTUAL_WIDTH // 2 + line_w):
             dist = abs(x - VIRTUAL_WIDTH // 2)
-            alpha = max(0, 150 - dist * 2)
-            surface.set_at((x, line_y), (200, 170, 80, alpha) if alpha > 0 else BLACK)
+            alpha = max(0, 200 - dist)
+            if alpha > 0:
+                surface.set_at((x, line_y), (200, 170, 80))
 
         # Menu
         self.menu.draw(surface)
@@ -367,8 +358,8 @@ class TitleScreen(Scene):
         # Footer
         blink = int(self.time * 2) % 3 != 0
         if blink:
-            draw_text(surface, "Press Z or Enter", VIRTUAL_WIDTH // 2, 225,
-                      GREY, 10, center=True)
+            draw_text(surface, "Press Z or Enter", VIRTUAL_WIDTH // 2, 1000,
+                      GREY, 30, center=True)
 
         draw_text(surface, "Based on LORD by Seth Able Robinson (1989)",
-                  VIRTUAL_WIDTH // 2, 235, (80, 80, 100), 8, center=True)
+                  VIRTUAL_WIDTH // 2, 1040, (80, 80, 100), 24, center=True)

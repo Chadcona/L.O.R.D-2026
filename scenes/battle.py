@@ -1,4 +1,4 @@
-# Battle Scene — turn-based JRPG combat (FF4/FF6 style)
+# Battle Scene — turn-based JRPG combat (FF4/FF6 style) — 1080p
 # Full animation sequencer: step forward, attack, recoil, step back
 
 import pygame
@@ -10,14 +10,15 @@ from ui.hud import draw_bar
 from systems.sprites import get_player_sprite, get_enemy_sprite
 from settings import (
     BLACK, WHITE, GOLD, RED, GREEN, BLUE, GREY, DARK_GREY, CREAM, BROWN,
-    VIRTUAL_WIDTH, VIRTUAL_HEIGHT
+    VIRTUAL_WIDTH, VIRTUAL_HEIGHT,
+    BATTLE_SPRITE_W, BATTLE_SPRITE_H, ENEMY_SPRITE_SIZE
 )
 
 
-# --- Battle background (unchanged) ---
+# --- Battle background ---
 
 def _create_battle_bg():
-    """Create a detailed SNES-style battle background with layered terrain."""
+    """Create a detailed 1080p battle background with layered terrain."""
     surf = pygame.Surface((VIRTUAL_WIDTH, VIRTUAL_HEIGHT))
     for y in range(VIRTUAL_HEIGHT):
         t = y / VIRTUAL_HEIGHT
@@ -35,46 +36,54 @@ def _create_battle_bg():
             r, g, b = int(35 + 20 * gt), int(70 + 30 * gt), int(35 + 10 * gt)
         pygame.draw.line(surf, (r, g, b), (0, y), (VIRTUAL_WIDTH, y))
 
-    star_positions = [(30, 8), (90, 15), (150, 5), (210, 20), (270, 12),
-                      (55, 25), (180, 8), (250, 30), (120, 18), (300, 10)]
+    # Stars
+    star_positions = [(180, 40), (540, 75), (900, 25), (1260, 100), (1620, 60),
+                      (330, 125), (1080, 40), (1500, 150), (720, 90), (1800, 50)]
     for sx, sy in star_positions:
-        surf.set_at((sx, sy), (200, 200, 220))
+        pygame.draw.circle(surf, (200, 200, 220), (sx, sy), 2)
 
+    # Mountains
     for x in range(VIRTUAL_WIDTH):
-        my = 75 + int(15 * math.sin(x * 0.02) + 8 * math.sin(x * 0.05) + 5 * math.sin(x * 0.1))
-        for y in range(my, 120):
-            t = (y - my) / max(1, 120 - my)
+        my = 380 + int(70 * math.sin(x * 0.004) + 40 * math.sin(x * 0.01) + 25 * math.sin(x * 0.02))
+        for y in range(my, 580):
+            t = (y - my) / max(1, 580 - my)
             surf.set_at((x, y), (int(15 + 20 * t), int(30 + 25 * t), int(20 + 15 * t)))
 
-    tree_xs = [10, 35, 60, 85, 130, 160, 195, 225, 255, 280, 305]
+    # Trees
+    tree_xs = [50, 180, 320, 460, 700, 880, 1060, 1240, 1400, 1560, 1720, 1860]
     for tx in tree_xs:
-        tree_h = 12 + (tx * 7) % 8
-        tree_y = 108 - tree_h
+        tree_h = 60 + (tx * 7) % 40
+        tree_y = 530 - tree_h
         tree_c = (20 + (tx * 3) % 10, 45 + (tx * 5) % 15, 20 + (tx * 2) % 8)
         for dy in range(tree_h // 2):
-            w = max(1, (tree_h // 2 - dy))
+            w = max(2, (tree_h // 2 - dy))
             for dx in range(-w, w + 1):
                 px = tx + dx
                 if 0 <= px < VIRTUAL_WIDTH:
                     surf.set_at((px, tree_y + dy), tree_c)
         for dy in range(tree_h // 2, tree_h):
-            surf.set_at((tx, tree_y + dy), (50, 30, 15))
+            for ddx in range(-2, 3):
+                px = tx + ddx
+                if 0 <= px < VIRTUAL_WIDTH:
+                    surf.set_at((px, tree_y + dy), (50, 30, 15))
 
-    for x in range(0, VIRTUAL_WIDTH, 6):
-        gy = 155 + (x * 7) % 10
+    # Ground grass detail
+    for x in range(0, VIRTUAL_WIDTH, 15):
+        gy = 770 + (x * 7) % 50
         grass_c = (45 + (x * 3) % 20, 90 + (x * 5) % 30, 40 + (x * 2) % 15)
         if gy < VIRTUAL_HEIGHT:
-            surf.set_at((x, gy), grass_c)
-            surf.set_at((x, gy - 1), (grass_c[0] + 10, grass_c[1] + 15, grass_c[2] + 5))
-            surf.set_at((x + 1, gy), grass_c)
+            for ddx in range(3):
+                surf.set_at((x + ddx, gy), grass_c)
+                surf.set_at((x + ddx, gy - 1), (grass_c[0] + 10, grass_c[1] + 15, grass_c[2] + 5))
 
-    stone_xs = [45, 120, 200, 275]
+    # Stones
+    stone_xs = [250, 680, 1150, 1600]
     for sx in stone_xs:
-        sy = 158 + (sx * 3) % 6
-        for dy in range(3):
-            for dx in range(4):
+        sy = 790 + (sx * 3) % 30
+        for dy in range(12):
+            for dx in range(18):
                 if sy + dy < VIRTUAL_HEIGHT:
-                    surf.set_at((sx + dx, sy + dy), (90 + (dx + dy) * 8, 85 + (dx + dy) * 6, 75 + (dx + dy) * 5))
+                    surf.set_at((sx + dx, sy + dy), (90 + (dx + dy) * 4, 85 + (dx + dy) * 3, 75 + (dx + dy) * 2))
 
     return surf
 
@@ -85,48 +94,15 @@ _battle_bg_cache = None
 # --- Animation sequencer ---
 
 class BattleAnim:
-    """A sequence of animation keyframes that plays out over time.
-
-    Each keyframe is a dict with:
-      - duration: seconds this keyframe lasts
-      - on_start: optional callable run once when keyframe begins
-      - on_finish: optional callable run once when keyframe ends
-
-    During a keyframe, `progress` (0.0 -> 1.0) is available for interpolation.
-    The animation stores named offsets that the draw code reads.
-    """
+    """A sequence of animation keyframes that plays out over time."""
 
     def __init__(self):
         self.keyframes = []
         self.current_idx = 0
         self.time = 0.0
         self.playing = False
-        self.on_complete = None  # Called when entire sequence finishes
+        self.on_complete = None
 
-        # Animated values the draw code reads
-        self.player_offset_x = 0.0
-        self.player_offset_y = 0.0
-        self.enemy_offset_x = 0.0
-        self.enemy_offset_y = 0.0
-        self.player_flash = 0.0    # 0-1, white flash intensity
-        self.enemy_flash = 0.0
-        self.player_frame = 0      # Walk frame for sprite
-        self.screen_shake = 0.0
-        self.screen_flash = 0.0    # 0-1, full screen white flash
-        self.slash_effect = None    # (x, y, progress) or None
-        self.spell_particles = []   # List of particle dicts
-        self.heal_particles = []
-        self.damage_number = None   # (x, y, text, color, progress) or None
-        self.enemy_squash = 1.0     # Y scale for hit squash (1.0 = normal)
-
-    def start(self, keyframes, on_complete=None):
-        """Begin playing a sequence of keyframes."""
-        self.keyframes = keyframes
-        self.current_idx = 0
-        self.time = 0.0
-        self.playing = True
-        self.on_complete = on_complete
-        # Reset visual state
         self.player_offset_x = 0.0
         self.player_offset_y = 0.0
         self.enemy_offset_x = 0.0
@@ -141,7 +117,27 @@ class BattleAnim:
         self.heal_particles = []
         self.damage_number = None
         self.enemy_squash = 1.0
-        # Run first keyframe's on_start
+
+    def start(self, keyframes, on_complete=None):
+        self.keyframes = keyframes
+        self.current_idx = 0
+        self.time = 0.0
+        self.playing = True
+        self.on_complete = on_complete
+        self.player_offset_x = 0.0
+        self.player_offset_y = 0.0
+        self.enemy_offset_x = 0.0
+        self.enemy_offset_y = 0.0
+        self.player_flash = 0.0
+        self.enemy_flash = 0.0
+        self.player_frame = 0
+        self.screen_shake = 0.0
+        self.screen_flash = 0.0
+        self.slash_effect = None
+        self.spell_particles = []
+        self.heal_particles = []
+        self.damage_number = None
+        self.enemy_squash = 1.0
         if self.keyframes:
             kf = self.keyframes[0]
             if "on_start" in kf:
@@ -155,14 +151,11 @@ class BattleAnim:
         kf = self.keyframes[self.current_idx]
         duration = kf["duration"]
 
-        # Progress within current keyframe
         progress = min(1.0, self.time / duration) if duration > 0 else 1.0
 
-        # Call the keyframe's per-frame update if it has one
         if "update" in kf:
             kf["update"](self, progress, dt)
 
-        # Update particles
         for p in self.spell_particles:
             p["life"] -= dt
             p["x"] += p["vx"] * dt
@@ -174,80 +167,70 @@ class BattleAnim:
             p["y"] += p["vy"] * dt
         self.heal_particles = [p for p in self.heal_particles if p["life"] > 0]
 
-        # Advance damage number
         if self.damage_number:
             dn = self.damage_number
             dn["progress"] += dt * 2.0
-            dn["y"] -= dt * 30  # Float upward
+            dn["y"] -= dt * 80
             if dn["progress"] >= 1.0:
                 self.damage_number = None
 
-        # Decay screen shake
         self.screen_shake = max(0, self.screen_shake - dt * 15)
 
         if self.time >= duration:
-            # Keyframe finished
             if "on_finish" in kf:
                 kf["on_finish"](self)
             self.current_idx += 1
             self.time = 0.0
             if self.current_idx >= len(self.keyframes):
-                # Animation complete
                 self.playing = False
                 if self.on_complete:
                     self.on_complete()
             else:
-                # Start next keyframe
                 next_kf = self.keyframes[self.current_idx]
                 if "on_start" in next_kf:
                     next_kf["on_start"](self)
 
 
-# --- Animation builders ---
+# --- Animation builders (1080p positions) ---
+
+# Player home: x=1440, y=450  |  Enemy home: x=300, y=430
 
 def _ease_out(t):
-    """Deceleration curve."""
     return 1.0 - (1.0 - t) ** 2
 
 def _ease_in(t):
-    """Acceleration curve."""
     return t * t
 
 def _ease_in_out(t):
-    """Smooth in-out."""
     return t * t * (3.0 - 2.0 * t)
 
 
 def build_player_attack_anim(damage_text, damage_color, is_crit=False):
-    """Hero steps forward, slashes, enemy recoils, hero steps back."""
-    step_dist = -70  # Move left toward enemy
+    step_dist = -420
 
     def step_forward(anim, progress, dt):
         t = _ease_out(progress)
         anim.player_offset_x = step_dist * t
-        # Walk animation during step
         anim.player_frame = int(progress * 6) % 4
 
     def hold_slash(anim, progress, dt):
         anim.player_offset_x = step_dist
-        anim.player_frame = 1  # Attack pose
-        # Slash effect across enemy
-        anim.slash_effect = {"x": 75, "y": 110, "progress": progress}
+        anim.player_frame = 1
+        anim.slash_effect = {"x": 450, "y": 500, "progress": progress}
 
     def hit_impact(anim, progress, dt):
         anim.player_offset_x = step_dist
         anim.player_frame = 1
-        # Enemy recoils right and squashes on hit
-        anim.enemy_offset_x = 8 * math.sin(progress * math.pi * 3) * (1 - progress)
+        anim.enemy_offset_x = 30 * math.sin(progress * math.pi * 3) * (1 - progress)
         anim.enemy_flash = 1.0 - progress
         anim.enemy_squash = 1.0 - 0.2 * math.sin(progress * math.pi)
         if progress < 0.15:
-            anim.screen_shake = 4 if not is_crit else 7
+            anim.screen_shake = 12 if not is_crit else 20
             anim.screen_flash = 0.4 if not is_crit else 0.7
 
     def show_damage(anim):
         anim.damage_number = {
-            "x": 75.0, "y": 95.0, "text": damage_text,
+            "x": 450.0, "y": 400.0, "text": damage_text,
             "color": damage_color, "progress": 0.0
         }
 
@@ -261,18 +244,16 @@ def build_player_attack_anim(damage_text, damage_color, is_crit=False):
         {"duration": 0.2, "update": step_forward},
         {"duration": 0.12, "update": hold_slash},
         {"duration": 0.3, "update": hit_impact, "on_start": lambda a: show_damage(a)},
-        {"duration": 0.15},  # Brief pause showing damage number
+        {"duration": 0.15},
         {"duration": 0.2, "update": step_back},
     ]
 
 
 def build_player_defend_anim():
-    """Hero braces — brief flash and slight crouch."""
     def brace(anim, progress, dt):
-        # Slight crouch
-        anim.player_offset_y = 3 * math.sin(progress * math.pi)
+        anim.player_offset_y = 12 * math.sin(progress * math.pi)
         anim.player_flash = 0.5 * math.sin(progress * math.pi)
-        anim.player_frame = 2  # Stable stance
+        anim.player_frame = 2
 
     return [
         {"duration": 0.4, "update": brace},
@@ -281,46 +262,43 @@ def build_player_defend_anim():
 
 
 def build_player_magic_anim(spell_name, damage_text, damage_color):
-    """Hero casts — glow, particles fly to enemy, enemy hit."""
     def cast_charge(anim, progress, dt):
         anim.player_flash = 0.3 + 0.4 * math.sin(progress * math.pi * 4)
-        anim.player_frame = 3  # Casting pose
-        # Spawn spell particles from player toward enemy
+        anim.player_frame = 3
         if random.random() < 0.4:
-            px = 240 + anim.player_offset_x
-            py = 115
+            px = 1440 + anim.player_offset_x
+            py = 520
             color = (255, 120, 30) if "Fire" in spell_name else (100, 180, 255)
             anim.spell_particles.append({
-                "x": px, "y": py + random.uniform(-10, 10),
-                "vx": random.uniform(-180, -120),
-                "vy": random.uniform(-20, 20),
+                "x": px, "y": py + random.uniform(-40, 40),
+                "vx": random.uniform(-600, -400),
+                "vy": random.uniform(-60, 60),
                 "color": color, "life": 0.5,
-                "size": random.randint(2, 4),
+                "size": random.randint(6, 14),
             })
 
     def spell_hit(anim, progress, dt):
         anim.player_frame = 3
         anim.enemy_flash = 0.8 * (1.0 - progress)
-        anim.enemy_offset_x = 5 * math.sin(progress * math.pi * 4) * (1 - progress)
+        anim.enemy_offset_x = 20 * math.sin(progress * math.pi * 4) * (1 - progress)
         anim.enemy_squash = 1.0 - 0.15 * math.sin(progress * math.pi)
         if progress < 0.1:
             anim.screen_flash = 0.5
-            anim.screen_shake = 4
-        # Burst particles at enemy location
+            anim.screen_shake = 12
         if progress < 0.3 and random.random() < 0.5:
             color = (255, 160, 50) if "Fire" in spell_name else (130, 200, 255)
             anim.spell_particles.append({
-                "x": 75 + random.uniform(-15, 15),
-                "y": 115 + random.uniform(-15, 15),
-                "vx": random.uniform(-40, 40),
-                "vy": random.uniform(-60, -20),
+                "x": 450 + random.uniform(-60, 60),
+                "y": 520 + random.uniform(-60, 60),
+                "vx": random.uniform(-100, 100),
+                "vy": random.uniform(-180, -60),
                 "color": color, "life": 0.4,
-                "size": random.randint(2, 5),
+                "size": random.randint(6, 16),
             })
 
     def show_damage(anim):
         anim.damage_number = {
-            "x": 75.0, "y": 95.0, "text": damage_text,
+            "x": 450.0, "y": 400.0, "text": damage_text,
             "color": damage_color, "progress": 0.0,
         }
 
@@ -332,8 +310,7 @@ def build_player_magic_anim(spell_name, damage_text, damage_color):
 
 
 def build_player_steal_anim(success, text):
-    """Hero dashes to enemy, grabs, dashes back."""
-    step_dist = -80
+    step_dist = -480
 
     def dash_forward(anim, progress, dt):
         t = _ease_out(progress)
@@ -344,15 +321,14 @@ def build_player_steal_anim(success, text):
         anim.player_offset_x = step_dist
         anim.player_frame = 1
         if success:
-            # Gold sparkle at grab point
             if random.random() < 0.4:
                 anim.spell_particles.append({
-                    "x": 90 + random.uniform(-5, 5),
-                    "y": 120 + random.uniform(-5, 5),
-                    "vx": random.uniform(-20, 20),
-                    "vy": random.uniform(-40, -10),
+                    "x": 540 + random.uniform(-20, 20),
+                    "y": 540 + random.uniform(-20, 20),
+                    "vx": random.uniform(-50, 50),
+                    "vy": random.uniform(-100, -30),
                     "color": (255, 220, 50), "life": 0.4,
-                    "size": 2,
+                    "size": 6,
                 })
 
     def dash_back(anim, progress, dt):
@@ -363,7 +339,7 @@ def build_player_steal_anim(success, text):
     def show_text(anim):
         color = GOLD if success else (180, 180, 180)
         anim.damage_number = {
-            "x": 75.0, "y": 100.0, "text": text,
+            "x": 450.0, "y": 440.0, "text": text,
             "color": color, "progress": 0.0,
         }
 
@@ -375,23 +351,21 @@ def build_player_steal_anim(success, text):
 
 
 def build_player_item_anim(text):
-    """Hero uses item — glow and heal particles."""
     def use_item(anim, progress, dt):
         anim.player_flash = 0.3 * math.sin(progress * math.pi)
         anim.player_frame = 2
-        # Green heal sparkles rising from player
         if random.random() < 0.4:
             anim.heal_particles.append({
-                "x": 245 + random.uniform(-10, 10),
-                "y": 140 + random.uniform(-5, 5),
-                "vy": random.uniform(-40, -20),
+                "x": 1470 + random.uniform(-40, 40),
+                "y": 640 + random.uniform(-20, 20),
+                "vy": random.uniform(-100, -50),
                 "color": (100, 255, 100), "life": 0.6,
-                "size": random.randint(2, 3),
+                "size": random.randint(6, 10),
             })
 
     def show_text(anim):
         anim.damage_number = {
-            "x": 245.0, "y": 95.0, "text": text,
+            "x": 1470.0, "y": 400.0, "text": text,
             "color": GREEN, "progress": 0.0,
         }
 
@@ -402,10 +376,9 @@ def build_player_item_anim(text):
 
 
 def build_player_flee_anim(success):
-    """Hero turns and runs right (off screen if success, back if fail)."""
     def run_right(anim, progress, dt):
         t = _ease_in(progress)
-        anim.player_offset_x = 80 * t if success else 30 * math.sin(progress * math.pi)
+        anim.player_offset_x = 480 * t if success else 150 * math.sin(progress * math.pi)
         anim.player_frame = int(progress * 8) % 4
 
     return [
@@ -414,13 +387,12 @@ def build_player_flee_anim(success):
 
 
 def build_player_berserk_anim(damage_text, damage_color):
-    """Warrior berserk — red flash, big step, powerful slash."""
-    step_dist = -80
+    step_dist = -480
 
     def charge_up(anim, progress, dt):
         anim.player_flash = 0.5 * abs(math.sin(progress * math.pi * 6))
         anim.player_frame = 2
-        anim.screen_shake = 1.5
+        anim.screen_shake = 5
 
     def lunge(anim, progress, dt):
         t = _ease_out(progress)
@@ -430,17 +402,17 @@ def build_player_berserk_anim(damage_text, damage_color):
     def double_slash(anim, progress, dt):
         anim.player_offset_x = step_dist
         anim.player_frame = 1
-        anim.slash_effect = {"x": 70, "y": 105, "progress": progress}
+        anim.slash_effect = {"x": 420, "y": 470, "progress": progress}
         anim.enemy_flash = 0.8 * abs(math.sin(progress * math.pi * 3))
-        anim.enemy_offset_x = 10 * math.sin(progress * math.pi * 5) * (1 - progress)
+        anim.enemy_offset_x = 40 * math.sin(progress * math.pi * 5) * (1 - progress)
         anim.enemy_squash = 1.0 - 0.25 * abs(math.sin(progress * math.pi * 2))
         if progress < 0.15:
-            anim.screen_shake = 8
+            anim.screen_shake = 24
             anim.screen_flash = 0.8
 
     def show_damage(anim):
         anim.damage_number = {
-            "x": 75.0, "y": 90.0, "text": damage_text,
+            "x": 450.0, "y": 380.0, "text": damage_text,
             "color": damage_color, "progress": 0.0,
         }
 
@@ -459,8 +431,7 @@ def build_player_berserk_anim(damage_text, damage_color):
 
 
 def build_enemy_attack_anim(damage_text, damage_color):
-    """Enemy lunges toward player, hits, recoils back."""
-    step_dist = 60
+    step_dist = 360
 
     def lunge_forward(anim, progress, dt):
         t = _ease_out(progress)
@@ -469,13 +440,13 @@ def build_enemy_attack_anim(damage_text, damage_color):
     def strike(anim, progress, dt):
         anim.enemy_offset_x = step_dist
         anim.player_flash = 0.8 * (1.0 - progress)
-        anim.player_offset_x = -6 * math.sin(progress * math.pi * 4) * (1 - progress)
+        anim.player_offset_x = -24 * math.sin(progress * math.pi * 4) * (1 - progress)
         if progress < 0.15:
-            anim.screen_shake = 5
+            anim.screen_shake = 15
 
     def show_damage(anim):
         anim.damage_number = {
-            "x": 245.0, "y": 95.0, "text": damage_text,
+            "x": 1470.0, "y": 400.0, "text": damage_text,
             "color": damage_color, "progress": 0.0,
         }
 
@@ -492,7 +463,6 @@ def build_enemy_attack_anim(damage_text, damage_color):
 
 
 def build_enemy_defend_anim():
-    """Enemy braces."""
     def brace(anim, progress, dt):
         anim.enemy_flash = 0.3 * math.sin(progress * math.pi)
         anim.enemy_squash = 1.0 + 0.08 * math.sin(progress * math.pi)
@@ -503,29 +473,27 @@ def build_enemy_defend_anim():
 
 
 def build_enemy_special_anim(spell_name, damage_text, damage_color):
-    """Enemy casts a special — glow, effect, player hit."""
     def cast(anim, progress, dt):
         anim.enemy_flash = 0.4 * abs(math.sin(progress * math.pi * 4))
-        # Dark particles from enemy
         if random.random() < 0.3:
             anim.spell_particles.append({
-                "x": 75 + random.uniform(-10, 10),
-                "y": 115 + random.uniform(-10, 10),
-                "vx": random.uniform(80, 140),
-                "vy": random.uniform(-15, 15),
+                "x": 450 + random.uniform(-40, 40),
+                "y": 520 + random.uniform(-40, 40),
+                "vx": random.uniform(300, 500),
+                "vy": random.uniform(-50, 50),
                 "color": (160, 80, 200), "life": 0.4,
-                "size": random.randint(2, 4),
+                "size": random.randint(6, 14),
             })
 
     def hit(anim, progress, dt):
         anim.player_flash = 0.7 * (1.0 - progress)
-        anim.player_offset_x = -4 * math.sin(progress * math.pi * 3) * (1 - progress)
+        anim.player_offset_x = -16 * math.sin(progress * math.pi * 3) * (1 - progress)
         if progress < 0.1:
-            anim.screen_shake = 3
+            anim.screen_shake = 10
 
     def show_damage(anim):
         anim.damage_number = {
-            "x": 245.0, "y": 95.0, "text": damage_text,
+            "x": 1470.0, "y": 400.0, "text": damage_text,
             "color": damage_color, "progress": 0.0,
         }
 
@@ -537,11 +505,10 @@ def build_enemy_special_anim(spell_name, damage_text, damage_color):
 
 
 def build_enemy_death_anim():
-    """Enemy flashes, squashes, and fades out."""
     def death(anim, progress, dt):
         anim.enemy_flash = abs(math.sin(progress * math.pi * 6)) * (1 - progress)
         anim.enemy_squash = max(0.0, 1.0 - progress * 1.2)
-        anim.enemy_offset_y = progress * 10
+        anim.enemy_offset_y = progress * 40
 
     return [
         {"duration": 0.8, "update": death},
@@ -551,19 +518,18 @@ def build_enemy_death_anim():
 # --- Main battle scene ---
 
 class BattleScene(Scene):
-    """Turn-based combat screen with full SNES-style battle animations."""
+    """Turn-based combat screen with full 1080p battle animations."""
 
-    # Home positions (pixels on the virtual canvas)
-    PLAYER_HOME_X = 240
-    PLAYER_HOME_Y = 100
-    ENEMY_HOME_X = 50
-    ENEMY_HOME_Y = 95
+    PLAYER_HOME_X = 1440
+    PLAYER_HOME_Y = 450
+    ENEMY_HOME_X = 300
+    ENEMY_HOME_Y = 430
 
     def __init__(self):
         super().__init__()
         self.player = None
         self.enemy = None
-        self.state = "start"  # start, player_turn, animating, enemy_turn, victory, defeat, etc.
+        self.state = "start"
         self.message_log = []
         self.message_timer = 0
         self.action_menu = None
@@ -573,7 +539,6 @@ class BattleScene(Scene):
         self.perfect_battle = True
         self.enemy_sprite = None
         self.anim = BattleAnim()
-        # Pending action after animation finishes
         self._pending_action = None
         self._enemy_alive_at_draw = True
 
@@ -596,7 +561,7 @@ class BattleScene(Scene):
         self._pending_action = None
         self._enemy_alive_at_draw = True
 
-        self.enemy_sprite = get_enemy_sprite(self.enemy.name, self.enemy.sprite_color, 48)
+        self.enemy_sprite = get_enemy_sprite(self.enemy.name, self.enemy.sprite_color, ENEMY_SPRITE_SIZE)
         self.anim = BattleAnim()
         self._create_action_menu()
 
@@ -609,14 +574,13 @@ class BattleScene(Scene):
             {"label": "Flee", "value": "flee"},
         ]
         self.action_menu = SelectionMenu(
-            items=items, x=170, y=185, spacing=14, font_size=12,
+            items=items, x=1020, y=830, spacing=42, font_size=36,
             show_box=False
         )
 
     def update(self, dt):
         self.anim_time += dt
 
-        # Update animation sequencer
         if self.anim.playing:
             self.anim.update(dt)
             return
@@ -646,13 +610,11 @@ class BattleScene(Scene):
             self.action_menu.update(dt)
 
     def handle_event(self, event):
-        # Skip messages
         if self.message_timer > 0:
             if event.type == pygame.KEYDOWN and event.key in (pygame.K_z, pygame.K_RETURN):
                 self.message_timer = 0.01
             return
 
-        # Can't interact during animations
         if self.anim.playing:
             return
 
@@ -660,8 +622,6 @@ class BattleScene(Scene):
             self.action_menu.handle_event(event)
             if self.action_menu.confirmed:
                 self._execute_player_action(self.action_menu.get_selected_value())
-
-    # --- Player actions (now launch animations) ---
 
     def _execute_player_action(self, action):
         self.state = "animating"
@@ -776,15 +736,11 @@ class BattleScene(Scene):
             self._after_player_action()
 
     def _after_player_action(self):
-        """Called after player action animation finishes."""
-        # Check if enemy died — play death animation
         if not self.enemy.is_alive():
-            self._enemy_alive_at_draw = True  # Still draw during death anim
+            self._enemy_alive_at_draw = True
             keyframes = build_enemy_death_anim()
             self.anim.start(keyframes, on_complete=lambda: self._enemy_died())
             return
-
-        # Otherwise, enemy takes its turn
         self._start_enemy_turn()
 
     def _enemy_died(self):
@@ -794,7 +750,6 @@ class BattleScene(Scene):
         self.message_timer = 1.0
 
     def _start_enemy_turn(self):
-        """Enemy turn — choose action, play animation, apply damage after."""
         self.state = "animating"
 
         if not self.enemy.is_alive():
@@ -832,31 +787,22 @@ class BattleScene(Scene):
         else:
             self._after_enemy_action()
 
-        # Handle passive regen
         if self.enemy.special == "regenerate" and self.enemy.is_alive():
             healed = 5
             self.enemy.hp = min(self.enemy.max_hp, self.enemy.hp + healed)
 
     def _after_enemy_action(self):
-        """After enemy animation finishes."""
         self.state = "enemy_turn_done"
         self.message_timer = 0.5
         self._create_action_menu()
 
     def _do_enemy_turn(self):
-        """Legacy hook called from main.py timer — no longer needed since we
-        now trigger enemy turn directly from _after_player_action.
-        Keep as no-op for compatibility."""
         pass
-
-    # --- Damage calc ---
 
     def _calc_player_damage(self):
         base = self.player.atk
         variance = random.randint(-base // 6, base // 6)
         return max(1, base + variance)
-
-    # --- Defeat / Rewards ---
 
     def _handle_defeat(self):
         gold_lost = self.player.gold // 4
@@ -881,7 +827,6 @@ class BattleScene(Scene):
         self.message_log.append(f"Gained {exp} EXP and {gold} gold!")
         self.message_log.extend(level_msgs)
 
-        # Roll for loot drops
         from systems.inventory import MATERIALS
         drops = self.enemy.roll_loot()
         for drop_name in drops:
@@ -899,44 +844,38 @@ class BattleScene(Scene):
     # --- Drawing ---
 
     def draw(self, surface):
-        # Background
         if _battle_bg_cache:
             surface.blit(_battle_bg_cache, (0, 0))
         else:
             surface.fill(BLACK)
 
-        a = self.anim  # Shorthand
+        a = self.anim
 
-        # Screen shake from animation
         shake_x = int(random.uniform(-a.screen_shake, a.screen_shake)) if a.screen_shake > 0.5 else 0
         shake_y = int(random.uniform(-a.screen_shake, a.screen_shake)) if a.screen_shake > 0.5 else 0
 
-        # --- Enemy drawing ---
+        # --- Enemy ---
         if self.enemy and self._enemy_alive_at_draw:
             ex = self.ENEMY_HOME_X + int(a.enemy_offset_x) + shake_x
             ey = self.ENEMY_HOME_Y + int(getattr(a, 'enemy_offset_y', 0)) + shake_y
-            # Breathing bob when idle
             if not a.playing:
-                ey += int(math.sin(self.anim_time * 2) * 2)
+                ey += int(math.sin(self.anim_time * 2) * 4)
 
-            # Ground shadow
-            shadow_surf = pygame.Surface((52, 12), pygame.SRCALPHA)
-            pygame.draw.ellipse(shadow_surf, (0, 0, 0, 50), (0, 0, 52, 12))
-            surface.blit(shadow_surf, (ex - 2, self.ENEMY_HOME_Y + 53 + shake_y))
+            shadow_surf = pygame.Surface((ENEMY_SPRITE_SIZE + 40, 24), pygame.SRCALPHA)
+            pygame.draw.ellipse(shadow_surf, (0, 0, 0, 50), (0, 0, ENEMY_SPRITE_SIZE + 40, 24))
+            surface.blit(shadow_surf, (ex - 10, self.ENEMY_HOME_Y + ENEMY_SPRITE_SIZE + 10 + shake_y))
 
-            # Enemy sprite with squash/stretch
             enemy_draw = self.enemy_sprite
             sprite_w = enemy_draw.get_width()
             sprite_h = enemy_draw.get_height()
             squash = a.enemy_squash
             if abs(squash - 1.0) > 0.01:
                 new_h = max(1, int(sprite_h * squash))
-                new_w = int(sprite_w * (1.0 + (1.0 - squash) * 0.5))  # Stretch width when squashed
+                new_w = int(sprite_w * (1.0 + (1.0 - squash) * 0.5))
                 enemy_draw = pygame.transform.scale(enemy_draw, (new_w, new_h))
-                ey += sprite_h - new_h  # Keep feet grounded
+                ey += sprite_h - new_h
                 ex -= (new_w - sprite_w) // 2
 
-            # Hit flash: tint white
             if a.enemy_flash > 0.05:
                 enemy_draw = enemy_draw.copy()
                 flash_alpha = int(min(200, a.enemy_flash * 250))
@@ -975,26 +914,22 @@ class BattleScene(Scene):
             surface.blit(flash_surf, (0, 0))
             a.screen_flash = max(0, a.screen_flash - 0.05)
 
-        # --- Player drawing ---
+        # --- Player ---
         if self.player:
             px = self.PLAYER_HOME_X + int(a.player_offset_x) + shake_x
             py = self.PLAYER_HOME_Y + int(a.player_offset_y) + shake_y
-            # Idle breathing
             if not a.playing:
-                py += int(math.sin(self.anim_time * 1.5 + 1) * 1)
+                py += int(math.sin(self.anim_time * 1.5 + 1) * 3)
 
-            # Ground shadow
-            shadow_surf = pygame.Surface((36, 8), pygame.SRCALPHA)
-            pygame.draw.ellipse(shadow_surf, (0, 0, 0, 50), (0, 0, 36, 8))
-            surface.blit(shadow_surf, (self.PLAYER_HOME_X - 2 + int(a.player_offset_x) + shake_x,
-                                       self.PLAYER_HOME_Y + 52 + shake_y))
+            shadow_surf = pygame.Surface((BATTLE_SPRITE_W + 30, 20), pygame.SRCALPHA)
+            pygame.draw.ellipse(shadow_surf, (0, 0, 0, 50), (0, 0, BATTLE_SPRITE_W + 30, 20))
+            surface.blit(shadow_surf, (self.PLAYER_HOME_X - 8 + int(a.player_offset_x) + shake_x,
+                                       self.PLAYER_HOME_Y + BATTLE_SPRITE_H + 10 + shake_y))
 
-            # Get sprite with walk frame from animation
             frame = a.player_frame if a.playing else 0
             player_spr = get_player_sprite(self.player.player_class, "left", frame)
-            scaled_player = pygame.transform.scale(player_spr, (32, 48))
+            scaled_player = pygame.transform.scale(player_spr, (BATTLE_SPRITE_W, BATTLE_SPRITE_H))
 
-            # Player flash
             if a.player_flash > 0.05:
                 scaled_player = scaled_player.copy()
                 flash_alpha = int(min(200, a.player_flash * 250))
@@ -1004,80 +939,74 @@ class BattleScene(Scene):
 
             surface.blit(scaled_player, (px, py))
 
-        # --- Damage numbers (floating) ---
+        # --- Damage numbers ---
         if a.damage_number:
             dn = a.damage_number
-            # Bounce up then float
             t = dn["progress"]
-            dy = -15 * math.sin(t * math.pi * 0.7)
+            dy = -50 * math.sin(t * math.pi * 0.7)
             alpha = max(0, 255 - int(t * 200))
             if alpha > 0:
                 draw_text(surface, dn["text"],
                           int(dn["x"]) + shake_x,
                           int(dn["y"] + dy) + shake_y,
-                          dn["color"], 14, center=True, shadow=True)
+                          dn["color"], 48, center=True, shadow=True)
 
         # --- Enemy HP bar ---
         if self.enemy:
-            draw_menu_box(surface, (10, 30, 135, 28))
-            draw_text(surface, self.enemy.name, 16, 33, WHITE, 11)
-            draw_bar(surface, 16, 45, 110, 8, self.enemy.hp, self.enemy.max_hp, RED)
-            draw_text(surface, f"{self.enemy.hp}/{self.enemy.max_hp}", 130, 44, WHITE, 8)
+            draw_menu_box(surface, (40, 120, 600, 90))
+            draw_text(surface, self.enemy.name, 60, 130, WHITE, 36)
+            draw_bar(surface, 60, 170, 500, 24, self.enemy.hp, self.enemy.max_hp, RED)
+            draw_text(surface, f"{self.enemy.hp}/{self.enemy.max_hp}", 570, 168, WHITE, 24)
 
         # --- Player stats ---
-        draw_menu_box(surface, (175, 30, 135, 38))
-        draw_text(surface, f"{self.player.name}", 182, 33, GOLD, 11)
-        draw_text(surface, f"Lv.{self.player.level} {self.player.player_class}", 182, 44, CREAM, 9)
-        draw_bar(surface, 182, 55, 70, 7, self.player.hp, self.player.max_hp, GREEN)
-        draw_text(surface, f"HP {self.player.hp}/{self.player.max_hp}", 256, 54, WHITE, 8)
-        draw_bar(surface, 182, 63, 50, 4, self.player.mp, self.player.max_mp, BLUE)
-        draw_text(surface, f"MP {self.player.mp}/{self.player.max_mp}", 236, 62, WHITE, 7)
+        draw_menu_box(surface, (1050, 120, 830, 110))
+        draw_text(surface, f"{self.player.name}", 1080, 130, GOLD, 36)
+        draw_text(surface, f"Lv.{self.player.level} {self.player.player_class}", 1080, 168, CREAM, 28)
+        draw_bar(surface, 1080, 200, 400, 20, self.player.hp, self.player.max_hp, GREEN)
+        draw_text(surface, f"HP {self.player.hp}/{self.player.max_hp}", 1500, 196, WHITE, 24)
+        draw_bar(surface, 1080, 224, 280, 14, self.player.mp, self.player.max_mp, BLUE)
+        draw_text(surface, f"MP {self.player.mp}/{self.player.max_mp}", 1380, 222, WHITE, 22)
 
         # --- Message log ---
-        draw_menu_box(surface, (5, 170, 155, 65))
-        y_offset = 175
-        for msg in self.message_log[-4:]:
-            draw_text(surface, msg, 10, y_offset, WHITE, 10)
-            y_offset += 13
+        draw_menu_box(surface, (30, 780, 920, 270))
+        y_offset = 800
+        for msg in self.message_log[-5:]:
+            draw_text(surface, msg, 50, y_offset, WHITE, 30)
+            y_offset += 42
 
         # --- Action menu ---
         if self.state == "player_turn":
-            draw_menu_box(surface, (162, 170, 153, 65))
-            draw_text(surface, "Command", 170, 174, GOLD, 11)
+            draw_menu_box(surface, (970, 780, 920, 270))
+            draw_text(surface, "Command", 1000, 790, GOLD, 34)
             if self.action_menu:
                 self.action_menu.draw(surface)
 
     def _draw_slash_effect(self, surface, slash, shake_x, shake_y):
-        """Draw an animated sword slash arc — classic FF style."""
         x = slash["x"] + shake_x
         y = slash["y"] + shake_y
         p = slash["progress"]
 
-        slash_surf = pygame.Surface((60, 40), pygame.SRCALPHA)
-        # Draw arc of slash lines
+        slash_surf = pygame.Surface((300, 200), pygame.SRCALPHA)
         num_lines = 5
         for i in range(num_lines):
             t = (i / num_lines + p * 0.3) * math.pi * 0.6
-            x1 = 30 + int(25 * math.cos(t - 0.3))
-            y1 = 20 + int(18 * math.sin(t - 0.3))
-            x2 = 30 + int(25 * math.cos(t + 0.3))
-            y2 = 20 + int(18 * math.sin(t + 0.3))
+            x1 = 150 + int(120 * math.cos(t - 0.3))
+            y1 = 100 + int(80 * math.sin(t - 0.3))
+            x2 = 150 + int(120 * math.cos(t + 0.3))
+            y2 = 100 + int(80 * math.sin(t + 0.3))
 
             alpha = int(255 * max(0, 1 - abs(p * num_lines - i) / 2))
             if alpha > 10:
                 color = (255, 255, 255, min(255, alpha))
-                # Thick slash line
-                pygame.draw.line(slash_surf, color, (x1, y1), (x2, y2), 2)
-                # Glow
+                pygame.draw.line(slash_surf, color, (x1, y1), (x2, y2), 6)
                 glow_color = (255, 255, 200, min(255, alpha // 2))
-                pygame.draw.line(slash_surf, glow_color, (x1 - 1, y1 - 1), (x2 + 1, y2 + 1), 3)
+                pygame.draw.line(slash_surf, glow_color, (x1 - 2, y1 - 2), (x2 + 2, y2 + 2), 8)
 
-        # Slash sparks
         if p < 0.8:
-            for _ in range(2):
-                sx = 30 + random.randint(-15, 15)
-                sy = 20 + random.randint(-10, 10)
+            for _ in range(4):
+                sx = 150 + random.randint(-60, 60)
+                sy = 100 + random.randint(-40, 40)
                 alpha = random.randint(100, 255)
-                pygame.draw.circle(slash_surf, (255, 255, 200, alpha), (sx, sy), 1)
+                pygame.draw.circle(slash_surf, (255, 255, 200, alpha), (sx, sy), 3)
 
-        surface.blit(slash_surf, (x - 30, y - 20))
+        surface.blit(slash_surf, (x - 150, y - 100))

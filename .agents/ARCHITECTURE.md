@@ -6,7 +6,7 @@ All game screens extend `Scene` (in `scenes/scene_manager.py`):
 - `on_exit()` — cleanup when leaving
 - `update(dt)` — game logic per frame (dt in seconds)
 - `handle_event(event)` — pygame event handling
-- `draw(surface)` — render to virtual screen (320x240)
+- `draw(surface)` — render to virtual screen (1920×1080)
 
 SceneManager handles transitions with optional fade effects:
 - `switch_to(name, data)` — fade out, switch, fade in
@@ -24,6 +24,8 @@ SceneManager handles transitions with optional fade effects:
 - `BattleAnim` class: keyframe sequencer with animated properties
 - Animation chain: action -> anim plays -> callback -> check death -> next turn
 - Enemy death: death animation -> victory state -> rewards + loot drops
+- Player home position: (1440, 450), Enemy home: (300, 430)
+- Battle sprites: player 192×288, enemy 288×288
 
 ## Inventory & Crafting (`systems/inventory.py`)
 - 7 material tiers: Wood, Copper, Iron, Steel, Enchanted, Dragon, Void
@@ -32,10 +34,13 @@ SceneManager handles transitions with optional fade effects:
 - Enemies drop materials based on their zone (shallow/deep/shadow)
 
 ## Sprite System (`systems/sprites.py`)
-- `create_player_sprite(class, facing, frame, hair)` -> 16x24 Surface
-- 4 facings: down/up use front/back view, left/right use true side profiles
-- `create_enemy_sprite(name, color, size)` -> 48x48 with type-specific drawers
-- Tile generators: grass, path, wall, water, door, tree
+- External sprite sheet: loads from `assets/sprites/characters.png`
+- `SPRITE_SHEET_REGIONS` in settings.py defines (x, y, w, h) per class/facing
+- Colorkey transparency removes cream background (255, 250, 219)
+- Sprites scaled to `PLAYER_SPRITE_W×PLAYER_SPRITE_H` (80×120) for overworld
+- Battle scene scales further to `BATTLE_SPRITE_W×BATTLE_SPRITE_H` (192×288)
+- Procedural fallback via `create_player_sprite()` if sheet unavailable
+- Enemy sprites and tiles still procedurally generated
 - All sprites cached via `get_player_sprite()` / `get_enemy_sprite()`
 
 ## Music System (`systems/music.py`)
@@ -44,13 +49,12 @@ SceneManager handles transitions with optional fade effects:
 - Drum synthesis: kick (sine sweep), snare (noise burst), hi-hat
 - Full chromatic note frequency table (C3-B5 with all sharps/flats)
 - BPM parameterized per track (town = 100 BPM, others = 130 BPM)
-- Town theme: C#-A-F#-Ab chord progression with boom bap drums
-- MusicManager: quits pre-existing mixer to force correct sample rate (22050 Hz), lazily builds tracks, loops playback per scene
-- Scene-to-track mapping in main.py via dict lookup with fallback stop
+- MusicManager: quits pre-existing mixer to force correct sample rate (22050 Hz)
 
 ## Town (`scenes/town.py`)
-- 20x15 tile map at 16x16 pixels per tile
-- Smooth pixel movement at 64px/s with walk animation
+- 20×15 tile map at 96px per tile (1920×1440 total map size)
+- Camera scrolling: viewport (1920×1080) follows player, clamped to map bounds
+- Smooth pixel movement at 384px/s with walk animation
 - 6 locations: Inn, Pub, Weapon Shop, Armour Shop, Blacksmith, Forest Gate
-- Visual details: hanging signs with icons, chimneys with smoke, lanterns, barrels, crates, well
+- Procedural tiles scaled from 16×16 to 96×96 at render time
 - NPC wanderers with pathfinding

@@ -33,12 +33,12 @@ class LoadGameScene(Scene):
 
         self.menu = SelectionMenu(
             items=items,
-            x=VIRTUAL_WIDTH // 2 - 90,
-            y=90,
-            spacing=20,
-            font_size=14,
+            x=VIRTUAL_WIDTH // 2 - 400,
+            y=400,
+            spacing=60,
+            font_size=42,
             show_box=True,
-            box_padding=12,
+            box_padding=30,
         )
 
     def update(self, dt):
@@ -65,9 +65,9 @@ class LoadGameScene(Scene):
 
     def draw(self, surface):
         surface.fill(BLACK)
-        draw_text(surface, "Continue Adventure", VIRTUAL_WIDTH // 2, 40,
-                  GOLD, 20, center=True)
-        draw_text(surface, "Select a save file:", VIRTUAL_WIDTH // 2, 65,
-                  WHITE, 12, center=True)
+        draw_text(surface, "Continue Adventure", VIRTUAL_WIDTH // 2, 180,
+                  GOLD, 72, center=True)
+        draw_text(surface, "Select a save file:", VIRTUAL_WIDTH // 2, 300,
+                  WHITE, 36, center=True)
         if self.menu:
             self.menu.draw(surface)

@@ -3,6 +3,11 @@
 # with proper shading, outlines, and animation frames like FF4/FF6
 
 import pygame
+import os
+from settings import (
+    USE_EXTERNAL_SPRITES, SPRITE_SHEET_PATH,
+    SPRITE_SHEET_REGIONS, PLAYER_SPRITE_W, PLAYER_SPRITE_H,
+)
 
 
 # --- Color palettes (SNES style with highlight/mid/shadow per material) ---
@@ -1413,13 +1418,80 @@ def create_roof_surface(width, height, color=(180, 60, 50)):
 
 # --- Sprite cache ---
 _sprite_cache = {}
+_external_sheet = None
+
+
+def _load_external_sheet():
+    """Load the external sprite sheet if it exists and is enabled."""
+    global _external_sheet
+    if not USE_EXTERNAL_SPRITES:
+        return None
+    if _external_sheet is not None:
+        return _external_sheet
+
+    if os.path.exists(SPRITE_SHEET_PATH):
+        try:
+            _external_sheet = pygame.image.load(SPRITE_SHEET_PATH).convert_alpha()
+            return _external_sheet
+        except pygame.error:
+            print(f"Error: Could not load sprite sheet at {SPRITE_SHEET_PATH}")
+    return None
+
+
+def _extract_sheet_sprite(sheet, player_class, facing):
+    """Extract a single sprite from the external sprite sheet.
+
+    Uses explicit pixel regions defined in SPRITE_SHEET_REGIONS (settings.py).
+    Each class has 3 poses: front (down), side (right), back (up).
+    Left facing is the right pose flipped horizontally.
+    """
+    class_regions = SPRITE_SHEET_REGIONS.get(player_class)
+    if not class_regions:
+        return None
+
+    lookup_facing = "right" if facing == "left" else facing
+    region = class_regions.get(lookup_facing)
+    if not region:
+        return None
+
+    x, y, w, h = region
+    rect = pygame.Rect(x, y, w, h)
+
+    sw, sh = sheet.get_size()
+    if rect.right > sw or rect.bottom > sh:
+        return None
+
+    try:
+        sprite = sheet.subsurface(rect).copy()
+        # Remove cream background color — make it transparent
+        sprite.set_colorkey((255, 250, 219))
+        # Convert to per-pixel alpha for clean edges
+        sprite = sprite.convert_alpha()
+        # Scale to game display size (not tiny 16x24)
+        sprite = pygame.transform.smoothscale(sprite, (PLAYER_SPRITE_W, PLAYER_SPRITE_H))
+        if facing == "left":
+            sprite = pygame.transform.flip(sprite, True, False)
+        return sprite
+    except ValueError:
+        return None
 
 
 def get_player_sprite(player_class, facing, frame, hair="brown"):
-    """Get a cached player sprite."""
+    """Get a cached player sprite (external or procedural)."""
     key = (player_class, facing, frame, hair)
-    if key not in _sprite_cache:
-        _sprite_cache[key] = create_player_sprite(player_class, facing, frame, hair)
+    if key in _sprite_cache:
+        return _sprite_cache[key]
+
+    # Try loading from external sheet first
+    sheet = _load_external_sheet()
+    if sheet:
+        sprite = _extract_sheet_sprite(sheet, player_class, facing)
+        if sprite:
+            _sprite_cache[key] = sprite
+            return _sprite_cache[key]
+
+    # Fallback to procedural generation
+    _sprite_cache[key] = create_player_sprite(player_class, facing, frame, hair)
     return _sprite_cache[key]
 
 
