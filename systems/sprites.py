@@ -1463,11 +1463,26 @@ def _extract_sheet_sprite(sheet, player_class, facing):
 
     try:
         sprite = sheet.subsurface(rect).copy()
-        # Remove cream background color — make it transparent
-        sprite.set_colorkey((255, 250, 219))
-        # Convert to per-pixel alpha for clean edges
         sprite = sprite.convert_alpha()
-        # Scale to game display size (not tiny 16x24)
+        # Remove cream/tan background and grid lines — the sheet has many
+        # slightly different shades of warm cream. Use color distance from
+        # two reference colors (light cream and darker grid lines).
+        for py in range(sprite.get_height()):
+            for px in range(sprite.get_width()):
+                r, g, b, a = sprite.get_at((px, py))
+                # Skip warm saturated colors (skin tones, leather, etc.)
+                if (r - g) > 20 and (g - b) > 20:
+                    continue
+                # Check distance from cream background (~247, 244, 219)
+                dr, dg, db = r - 247, g - 244, b - 219
+                if dr * dr + dg * dg + db * db < 1600:
+                    sprite.set_at((px, py), (0, 0, 0, 0))
+                    continue
+                # Check distance from grid lines (~192, 178, 134)
+                dr, dg, db = r - 192, g - 178, b - 134
+                if dr * dr + dg * dg + db * db < 900:
+                    sprite.set_at((px, py), (0, 0, 0, 0))
+        # Scale to game display size
         sprite = pygame.transform.smoothscale(sprite, (PLAYER_SPRITE_W, PLAYER_SPRITE_H))
         if facing == "left":
             sprite = pygame.transform.flip(sprite, True, False)
