@@ -49,11 +49,12 @@ NPC_SPRITE_SHEETS = {
 # Sprite sheet layout (shared by all 2816x1536 character/NPC sheets)
 # Sprites are at irregular positions — define exact bounding boxes per frame.
 # Row Y ranges (y_start, y_end) for each animation row:
+# Tuned to start below label text and end before the next label
 SHEET_ROW_Y = {
-    "walk_fb": (200, 350),   # Row 1: front/back walk
-    "walk_lr": (470, 690),   # Row 2: left/right walk
-    "idle":    (880, 1060),  # Row 3: idle
-    "combat":  (1200, 1460), # Row 4: combat
+    "walk_fb": (165, 375),   # Row 1: front/back walk
+    "walk_lr": (438, 715),   # Row 2: left/right walk
+    "idle":    (845, 1090),  # Row 3: idle
+    "combat":  (1170, 1490), # Row 4: combat
 }
 
 # X bounding boxes for walk animation frames (4 frames per direction)

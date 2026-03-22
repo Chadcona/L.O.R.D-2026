@@ -1458,50 +1458,38 @@ def _is_bg_color(r, g, b):
 
 
 def _remove_background(sprite):
-    """Remove background using flood-fill from edges.
+    """Remove background using proximity to sprite content.
 
-    Only removes cream/grid pixels that are connected to the cell border.
-    This preserves white clothing, aprons, etc. that are surrounded by
-    sprite pixels.
+    A bg-colored pixel is kept if it's within RADIUS pixels of any
+    non-bg pixel (e.g. white apron near dark outline = keep).
+    Isolated bg pixels far from any sprite content are removed.
     """
+    RADIUS = 4
     w, h = sprite.get_size()
-    # Build a mask of candidate background pixels
-    is_bg = [[False] * h for _ in range(w)]
+
+    # Build mask: True = definitely sprite content (dark or colorful)
+    is_sprite = [[False] * h for _ in range(w)]
     for px in range(w):
         for py in range(h):
             r, g, b, a = sprite.get_at((px, py))
-            is_bg[px][py] = _is_bg_color(r, g, b)
+            if not _is_bg_color(r, g, b):
+                is_sprite[px][py] = True
 
-    # Flood-fill from all border pixels
-    to_clear = [[False] * h for _ in range(w)]
-    stack = []
-    for px in range(w):
-        if is_bg[px][0]:
-            stack.append((px, 0))
-        if is_bg[px][h - 1]:
-            stack.append((px, h - 1))
-    for py in range(h):
-        if is_bg[0][py]:
-            stack.append((0, py))
-        if is_bg[w - 1][py]:
-            stack.append((w - 1, py))
-
-    while stack:
-        px, py = stack.pop()
-        if px < 0 or px >= w or py < 0 or py >= h:
-            continue
-        if to_clear[px][py] or not is_bg[px][py]:
-            continue
-        to_clear[px][py] = True
-        stack.append((px - 1, py))
-        stack.append((px + 1, py))
-        stack.append((px, py - 1))
-        stack.append((px, py + 1))
-
-    # Apply transparency only to flood-filled background pixels
+    # Expand sprite mask by RADIUS pixels (simple box dilation)
+    near_sprite = [[False] * h for _ in range(w)]
     for px in range(w):
         for py in range(h):
-            if to_clear[px][py]:
+            if is_sprite[px][py]:
+                for dx in range(-RADIUS, RADIUS + 1):
+                    for dy in range(-RADIUS, RADIUS + 1):
+                        nx, ny = px + dx, py + dy
+                        if 0 <= nx < w and 0 <= ny < h:
+                            near_sprite[nx][ny] = True
+
+    # Remove bg pixels that are NOT near any sprite content
+    for px in range(w):
+        for py in range(h):
+            if not is_sprite[px][py] and not near_sprite[px][py]:
                 sprite.set_at((px, py), (0, 0, 0, 0))
     return sprite
 
