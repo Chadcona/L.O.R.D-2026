@@ -1494,6 +1494,16 @@ def _remove_background(sprite):
     return sprite
 
 
+def _sheet_has_alpha(sheet):
+    """Check if a sheet already has meaningful alpha transparency."""
+    # Sample a few corner pixels — if any are transparent, the sheet has alpha
+    w, h = sheet.get_size()
+    for x, y in [(5, 5), (w - 5, 5), (5, h - 5), (w - 5, h - 5)]:
+        if sheet.get_at((x, y))[3] < 128:
+            return True
+    return False
+
+
 def _extract_sprite(sheet, x_start, x_end, row_name, target_w, target_h):
     """Extract one sprite from a sheet using exact bounding box coordinates."""
     row_y = SHEET_ROW_Y.get(row_name)
@@ -1508,7 +1518,9 @@ def _extract_sprite(sheet, x_start, x_end, row_name, target_w, target_h):
     try:
         sprite = sheet.subsurface(rect).copy()
         sprite = sprite.convert_alpha()
-        _remove_background(sprite)
+        # Only remove background if the sheet doesn't already have alpha
+        if not _sheet_has_alpha(sheet):
+            _remove_background(sprite)
         sprite = pygame.transform.smoothscale(sprite, (target_w, target_h))
         return sprite
     except ValueError:
