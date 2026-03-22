@@ -1437,76 +1437,89 @@ def _load_sheet(path):
     return None
 
 
-def _is_bg_color(r, g, b):
-    """Check if a pixel color looks like sheet background.
+_sheet_bg_cache = {}  # path -> (r, g, b) or None (has alpha)
 
-    Handles white, grey, cream backgrounds and grid lines.
-    Keeps saturated/dark sprite pixels.
+
+def _detect_sheet_bg(sheet, path):
+    """Auto-detect the background color of a sheet by sampling corners."""
+    if path in _sheet_bg_cache:
+        return _sheet_bg_cache[path]
+
+    w, h = sheet.get_size()
+    samples = []
+    for x, y in [(5, 5), (w - 5, 5), (5, h - 5), (w - 5, h - 5),
+                  (20, 20), (w - 20, 20), (20, h - 20)]:
+        c = sheet.get_at((x, y))
+        if c[3] < 128:
+            # Sheet has real alpha — no background removal needed
+            _sheet_bg_cache[path] = None
+            return None
+        samples.append((c[0], c[1], c[2]))
+
+    # Average the corner samples to get the background color
+    avg_r = sum(s[0] for s in samples) // len(samples)
+    avg_g = sum(s[1] for s in samples) // len(samples)
+    avg_b = sum(s[2] for s in samples) // len(samples)
+    bg = (avg_r, avg_g, avg_b)
+    _sheet_bg_cache[path] = bg
+    return bg
+
+
+def _remove_background(sprite, bg_color):
+    """Remove background using auto-detected BG color + proximity.
+
+    Uses get_at for classification, then batch set_at only for bg pixels.
     """
-    mx = max(r, g, b)
-    mn = min(r, g, b)
-    sat = mx - mn
-    # Any light desaturated pixel (white, light grey, cream, grid lines)
-    # sat < 35 catches greys and creams; mx > 120 avoids dark sprite outlines
-    if sat < 35 and mx > 120:
-        return True
-    # Warm cream background (old sheet compat)
-    if (r - g) > 20 and (g - b) > 20:
-        return False
-    dr, dg, db = r - 247, g - 244, b - 219
-    if dr * dr + dg * dg + db * db < 1200:
-        return True
-    return False
-
-
-def _remove_background(sprite):
-    """Remove background using proximity to sprite content.
-
-    A bg-colored pixel is kept if it's within RADIUS pixels of any
-    non-bg pixel (e.g. white apron near dark outline = keep).
-    Isolated bg pixels far from any sprite content are removed.
-    """
-    RADIUS = 4
+    RADIUS = 3
+    DIST_SQ = 2500
+    bg_r, bg_g, bg_b = bg_color
+    bg_mx = max(bg_r, bg_g, bg_b)
     w, h = sprite.get_size()
 
-    # Build mask: True = definitely sprite content (dark or colorful)
-    is_sprite = [[False] * h for _ in range(w)]
-    for px in range(w):
-        for py in range(h):
-            r, g, b, a = sprite.get_at((px, py))
-            if not _is_bg_color(r, g, b):
-                is_sprite[px][py] = True
+    # Classify pixels: 1 = sprite content, 0 = background candidate
+    is_sprite = bytearray(w * h)
+    bg_list = []  # list of (x, y) bg pixels to potentially clear
 
-    # Expand sprite mask by RADIUS pixels (simple box dilation)
-    near_sprite = [[False] * h for _ in range(w)]
-    for px in range(w):
-        for py in range(h):
-            if is_sprite[px][py]:
-                for dx in range(-RADIUS, RADIUS + 1):
-                    for dy in range(-RADIUS, RADIUS + 1):
-                        nx, ny = px + dx, py + dy
-                        if 0 <= nx < w and 0 <= ny < h:
-                            near_sprite[nx][ny] = True
+    sprite.lock()
+    for y in range(h):
+        row = y * w
+        for x in range(w):
+            r, g, b, a = sprite.get_at((x, y))
+            dr, dg, db = r - bg_r, g - bg_g, b - bg_b
+            if dr * dr + dg * dg + db * db < DIST_SQ:
+                bg_list.append((x, y))
+                continue
+            mx = max(r, g, b)
+            mn = min(r, g, b)
+            if mx - mn < 25 and abs(mx - bg_mx) < 50:
+                bg_list.append((x, y))
+                continue
+            is_sprite[row + x] = 1
 
-    # Remove bg pixels that are NOT near any sprite content
-    for px in range(w):
-        for py in range(h):
-            if not is_sprite[px][py] and not near_sprite[px][py]:
-                sprite.set_at((px, py), (0, 0, 0, 0))
+    # For each bg pixel, check if any sprite pixel within RADIUS
+    clear = (0, 0, 0, 0)
+    for bx, by in bg_list:
+        found = False
+        y0 = max(0, by - RADIUS)
+        y1 = min(h, by + RADIUS + 1)
+        x0 = max(0, bx - RADIUS)
+        x1 = min(w, bx + RADIUS + 1)
+        for ny in range(y0, y1):
+            nr = ny * w
+            for nx in range(x0, x1):
+                if is_sprite[nr + nx]:
+                    found = True
+                    break
+            if found:
+                break
+        if not found:
+            sprite.set_at((bx, by), clear)
+
+    sprite.unlock()
     return sprite
 
 
-def _sheet_has_alpha(sheet):
-    """Check if a sheet already has meaningful alpha transparency."""
-    # Sample a few corner pixels — if any are transparent, the sheet has alpha
-    w, h = sheet.get_size()
-    for x, y in [(5, 5), (w - 5, 5), (5, h - 5), (w - 5, h - 5)]:
-        if sheet.get_at((x, y))[3] < 128:
-            return True
-    return False
-
-
-def _extract_sprite(sheet, x_start, x_end, row_name, target_w, target_h):
+def _extract_sprite(sheet, path, x_start, x_end, row_name, target_w, target_h):
     """Extract one sprite from a sheet using exact bounding box coordinates."""
     row_y = SHEET_ROW_Y.get(row_name)
     if not row_y:
@@ -1520,9 +1533,9 @@ def _extract_sprite(sheet, x_start, x_end, row_name, target_w, target_h):
     try:
         sprite = sheet.subsurface(rect).copy()
         sprite = sprite.convert_alpha()
-        # Only remove background if the sheet doesn't already have alpha
-        if not _sheet_has_alpha(sheet):
-            _remove_background(sprite)
+        bg = _detect_sheet_bg(sheet, path)
+        if bg is not None:
+            _remove_background(sprite, bg)
         sprite = pygame.transform.smoothscale(sprite, (target_w, target_h))
         return sprite
     except ValueError:
@@ -1551,7 +1564,7 @@ def get_player_sprite(player_class, facing, frame, hair="brown"):
                 if x_positions and walk_frame < len(x_positions):
                     x_start, x_end = x_positions[walk_frame]
                     row = "walk_fb" if facing in ("down", "up") else "walk_lr"
-                    sprite = _extract_sprite(sheet, x_start, x_end, row,
+                    sprite = _extract_sprite(sheet, sheet_path, x_start, x_end, row,
                                              PLAYER_SPRITE_W, PLAYER_SPRITE_H)
 
     if sprite is None:
