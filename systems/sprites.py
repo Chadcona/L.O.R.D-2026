@@ -1438,15 +1438,17 @@ def _load_sheet(path):
 
 
 def _is_bg_color(r, g, b):
-    """Check if a pixel color looks like sheet background (white or grid lines)."""
+    """Check if a pixel color looks like sheet background.
+
+    Handles white, grey, cream backgrounds and grid lines.
+    Keeps saturated/dark sprite pixels.
+    """
     mx = max(r, g, b)
     mn = min(r, g, b)
     sat = mx - mn
-    # White/near-white background
-    if mx > 230 and sat < 30:
-        return True
-    # Cool grey grid lines (~140, 150, 155)
-    if 120 < mx < 200 and sat < 30:
+    # Any light desaturated pixel (white, light grey, cream, grid lines)
+    # sat < 35 catches greys and creams; mx > 120 avoids dark sprite outlines
+    if sat < 35 and mx > 120:
         return True
     # Warm cream background (old sheet compat)
     if (r - g) > 20 and (g - b) > 20:
