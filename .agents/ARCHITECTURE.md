@@ -34,14 +34,22 @@ SceneManager handles transitions with optional fade effects:
 - Enemies drop materials based on their zone (shallow/deep/shadow)
 
 ## Sprite System (`systems/sprites.py`)
-- External sprite sheet: loads from `assets/sprites/characters.png`
-- `SPRITE_SHEET_REGIONS` in settings.py defines (x, y, w, h) per class/facing
-- Colorkey transparency removes cream background (255, 250, 219)
-- Sprites scaled to `PLAYER_SPRITE_W×PLAYER_SPRITE_H` (80×120) for overworld
-- Battle scene scales further to `BATTLE_SPRITE_W×BATTLE_SPRITE_H` (192×288)
-- Procedural fallback via `create_player_sprite()` if sheet unavailable
+- **Per-class sheets**: each class/NPC has its own 2816×1536 PNG
+  - `CLASS_SPRITE_SHEETS` maps class names to file paths
+  - `NPC_SPRITE_SHEETS` maps NPC names (Seth, Violet, Cat) to file paths
+- **Sheet layout**: all sheets share the same grid structure
+  - Row 1 (y=165-375): walk front (cells 0-3) + walk back (cells 4+)
+  - Row 2 (y=438-715): walk left (cells 0-3) + walk right (cells 4+)
+  - Row 3 (y=845-1090): idle animation
+  - Row 4 (y=1170-1490): combat sequence
+  - Exact X bounding boxes per frame defined in `SHEET_WALK_X`
+- **Background removal**: auto-detects BG color per sheet from corner pixels
+  - Color distance threshold (dist² < 2500) + desaturation check
+  - Proximity-based preservation: bg pixels within 3px of sprite content are kept (preserves white clothing)
+  - Sheets with true alpha transparency skip removal entirely
+- **Caching**: all sprites cached on first access via `_sprite_cache`
+- **Procedural fallback**: `create_player_sprite()` if no sheet available
 - Enemy sprites and tiles still procedurally generated
-- All sprites cached via `get_player_sprite()` / `get_enemy_sprite()`
 
 ## Music System (`systems/music.py`)
 - Procedural chiptune generated from note sequences at runtime
@@ -50,6 +58,7 @@ SceneManager handles transitions with optional fade effects:
 - Full chromatic note frequency table (C3-B5 with all sharps/flats)
 - BPM parameterized per track (town = 100 BPM, others = 130 BPM)
 - MusicManager: quits pre-existing mixer to force correct sample rate (22050 Hz)
+- Stereo fix: `_samples_to_sound` duplicates mono samples to L+R when mixer is stereo
 
 ## Town (`scenes/town.py`)
 - 20×15 tile map at 96px per tile (1920×1440 total map size)
@@ -57,4 +66,4 @@ SceneManager handles transitions with optional fade effects:
 - Smooth pixel movement at 384px/s with walk animation
 - 6 locations: Inn, Pub, Weapon Shop, Armour Shop, Blacksmith, Forest Gate
 - Procedural tiles scaled from 16×16 to 96×96 at render time
-- NPC wanderers with pathfinding
+- NPC wanderers: Seth, Violet, Cat — each using dedicated sprite sheets with walk cycles

@@ -6,10 +6,12 @@ A single-player SNES-style JRPG built with Python and Pygame, inspired by the cl
 
 ### Graphics
 - Native 1080p rendering with hand-drawn sprite sheet characters
-- External sprite sheet support (Warrior, Rogue/Thief, Cleric, Mage) with auto-detected regions and transparent backgrounds
+- Per-class sprite sheets with 4-frame walk animations in all directions
+- Auto-detected background removal (supports white, grey, or transparent PNG backgrounds)
+- Dedicated NPC sprite sheets (Seth the tavern keeper, Violet the barmaid, town cat)
 - Procedural pixel art fallback for enemies, tiles, and environmental details
 - Smooth pixel-by-pixel movement with walk animation
-- Atmospheric effects: fog particles, fireflies, chimney smoke, flickering lanterns
+- Atmospheric effects: fog particles, fireflies
 - Parallax starfield title screen with animated dragon sprite
 - Camera scrolling in town (20×15 tile map at 96px tiles)
 - Fullscreen support (F11 or Alt+Enter)
@@ -31,7 +33,7 @@ A single-player SNES-style JRPG built with Python and Pygame, inspired by the cl
 
 ### World
 - Town of Pinnacle with 6 locations: Inn, Pub, Weapon Shop, Armour Shop, Blacksmith, Forest Gate
-- NPC wanderers with patrol paths
+- NPC wanderers: Seth (tavern keeper), Violet (barmaid), town cat
 - Mystic Forest with 3 zones: Shallow Forest, Deep Forest, Shadow Depths
 - Daily turn system — rest at the Inn to reset forest turns
 
@@ -39,12 +41,13 @@ A single-player SNES-style JRPG built with Python and Pygame, inspired by the cl
 - Procedurally generated chiptune soundtrack
 - Unique themes for title screen, town, forest, and battle
 - Town groove: C#-A-F#-Ab chord progression at 100 BPM with boom bap drums
+- Stereo-correct playback (auto-handles mono→stereo mixer conversion)
 - All music synthesized at runtime from note sequences
 
 ### Technical
 - Python 3.11+ / Pygame 2.6+
-- Native 1920×1080 virtual resolution (no upscaling needed)
-- External sprite sheet with auto-detected bounding regions and colorkey transparency
+- Native 1920×1080 rendering (no upscaling)
+- Per-class sprite sheets with auto-detected background color and proximity-based removal
 - Procedural sprite fallback when no sprite sheet is present
 - Resizable window with fullscreen toggle
 - JSON save/load system
@@ -62,8 +65,25 @@ pip install pygame
 python main.py
 ```
 
-### Sprite Sheet
-Place your character sprite sheet at `assets/sprites/characters.png`. The game auto-detects sprite regions for each class (Warrior, Thief, Cleric, Mage) with 3 poses each (front, side, back). If no sprite sheet is found, procedural sprites are used as fallback.
+### Sprite Sheets
+Place character sprite sheets in `assets/sprites/`:
+
+| File | Character |
+|------|-----------|
+| `warrior.png` | Warrior class |
+| `Thief.png` | Thief class |
+| `mage.png` | Mage class |
+| `Sethable Tavern Keeper.png` | Seth (NPC) |
+| `violet tavernmaid mayors daughter.png` | Violet (NPC) |
+| `town cat neko.png` | Town cat (NPC) |
+
+All sheets are 2816×1536 with a consistent layout:
+- **Row 1**: 8-frame walk (front/back views)
+- **Row 2**: 8-frame walk (left/right views)
+- **Row 3**: 4-frame idle animation
+- **Row 4**: 8-frame combat sequence
+
+Background is auto-detected from corner pixels and removed. For best results, export sheets with **transparent PNG backgrounds**.
 
 ### Controls
 | Key | Action |
@@ -77,11 +97,11 @@ Place your character sprite sheet at `assets/sprites/characters.png`. The game a
 ## Project Structure
 ```
 main.py              - Game entry point and loop
-settings.py          - Constants, configuration, sprite sheet regions
+settings.py          - Constants, configuration, sprite sheet layout
 scenes/              - Game screens (title, town, forest, battle, etc.)
 systems/             - Core systems (player, enemy, inventory, sprites, music)
 ui/                  - Menu and HUD components
-assets/sprites/      - External sprite sheet (characters.png)
+assets/sprites/      - Character and NPC sprite sheets
 saves/               - Save game files
 .agents/             - AI context documentation
 ```
@@ -97,6 +117,7 @@ saves/               - Save game files
 - Sound effects for combat, menus, and environment
 - Reputation system affecting NPC dialogue and shop prices
 - Day/night cycle with visual changes
+- Town tiles and tavern building sprites (assets staged)
 
 ## Credits
 - Based on **Legend of the Red Dragon** by Seth Able Robinson (1989)

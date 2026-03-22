@@ -1,13 +1,13 @@
 # Legend of the Red Dragon: 16-Bit Edition
 
 ## What Is This?
-A single-player SNES-style JRPG built with Python + Pygame, based on the classic 1989 BBS door game "Legend of the Red Dragon" (LORD) by Seth Able Robinson. It features hand-drawn sprite sheet characters, procedurally generated pixel art for enemies/tiles/music, and a retro aesthetic.
+A single-player SNES-style JRPG built with Python + Pygame, based on the classic 1989 BBS door game "Legend of the Red Dragon" (LORD) by Seth Able Robinson. It features hand-drawn per-class sprite sheets with walk animations, procedurally generated enemies/tiles/music, and a retro aesthetic.
 
 ## Tech Stack
 - **Language**: Python 3.11+
 - **Framework**: Pygame 2.6+
-- **Platform**: Cross-platform
-- **Assets**: External sprite sheet for characters (`assets/sprites/characters.png`), procedural generation for enemies, tiles, and music
+- **Platform**: Cross-platform (developed on Windows 11)
+- **Assets**: Per-class sprite sheets for characters and NPCs, procedural generation for enemies, tiles, and music
 
 ## Display
 - Native 1920×1080 rendering (virtual resolution = screen resolution, no upscaling)
@@ -17,7 +17,7 @@ A single-player SNES-style JRPG built with Python + Pygame, based on the classic
 ## Project Structure
 ```
 main.py              - Game entry point, loop, fullscreen toggle, music hookup
-settings.py          - All constants: colors, screen size, tile size, sprite regions, level tables, paths
+settings.py          - All constants: colors, screen size, tile size, sprite layout, level tables, paths
 pyproject.toml       - Project metadata and Pyright config
 
 scenes/              - Scene system (each screen is a Scene subclass)
@@ -33,23 +33,31 @@ systems/             - Core game systems
   player.py          - Player class: stats, equipment, leveling, serialization
   enemy.py           - 12 enemy types across 3 zones, AI, loot drops
   inventory.py       - Material tiers, weapons, armour, crafting recipes
-  sprites.py         - Sprite sheet loader + procedural fallback sprite generator
-  music.py           - Procedural chiptune music engine
+  sprites.py         - Per-class sprite sheet loader with auto BG removal + procedural fallback
+  music.py           - Procedural chiptune music engine (stereo-correct)
   save_load.py       - JSON save/load to saves/ directory
 
 ui/                  - UI components
   menu.py            - SelectionMenu, DialogueBox, draw_text, draw_menu_box
   hud.py             - Player HUD overlay (HP/MP bars, gold, level)
 
-assets/sprites/      - External sprite sheet (characters.png)
+assets/sprites/      - Per-class sprite sheets (2816×1536 PNGs)
+  warrior.png, Thief.png, mage.png          - Player class sheets
+  Sethable Tavern Keeper.png                - Seth NPC
+  violet tavernmaid mayors daughter.png     - Violet NPC
+  town cat neko.png                         - Cat NPC
+  town_tiles.png, Tavern.png                - Environment assets (staged)
+
 saves/               - Save game files (JSON)
 ```
 
 ## Key Design Decisions
-1. **External sprite sheet** — 2816×1536 character sheet with auto-detected bounding regions per class/pose, colorkey transparency for cream background
-2. **Procedural fallback** — if no sprite sheet exists, procedural pixel art sprites are generated
-3. **Native 1080p** — renders directly at 1920×1080 (no virtual screen upscaling)
-4. **Camera scrolling** in town — 20×15 tile map at 96px tiles (1920×1440 total), viewport follows player
-5. **Dual coordinate system** in town — tile-based logical positions + pixel-based smooth visual positions
-6. **Animation sequencer** in battle — keyframe system with easing curves for FF4/FF6-style combat animations
-7. **Material tier system** — 7 tiers (Wood through Void) with multiplier-based stat scaling
+1. **Per-class sprite sheets** — each class/NPC has its own 2816×1536 sheet with walk, idle, and combat animations. Background color is auto-detected per sheet and removed with proximity-based algorithm
+2. **Alpha PNG support** — sheets with true transparency bypass background removal entirely
+3. **Procedural fallback** — if no sprite sheet exists for a class, procedural pixel art sprites are generated
+4. **Native 1080p** — renders directly at 1920×1080 (no virtual screen upscaling)
+5. **Camera scrolling** in town — 20×15 tile map at 96px tiles (1920×1440 total), viewport follows player
+6. **Dual coordinate system** in town — tile-based logical positions + pixel-based smooth visual positions
+7. **Animation sequencer** in battle — keyframe system with easing curves for FF4/FF6-style combat animations
+8. **Material tier system** — 7 tiers (Wood through Void) with multiplier-based stat scaling
+9. **Stereo-correct music** — auto-duplicates mono samples to stereo when SDL forces stereo mixer
