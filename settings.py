@@ -46,21 +46,25 @@ NPC_SPRITE_SHEETS = {
     "Cat":    os.path.join(SPRITES_DIR, "town cat neko.png"),
 }
 
-# Sprite sheet grid layout (shared by all character/NPC sheets)
-# All sheets are 2816x1536 with 8 columns of 352px each
-SHEET_CELL_W = 352  # 2816 / 8
-SHEET_ROWS = {
-    # name: (y_start, height, num_frames)
-    "walk_front": (168, 200, 4),   # Row 1 left half: front-facing walk
-    "walk_back":  (168, 200, 4),   # Row 1 right half: back-facing walk (offset +4 cells)
-    "walk_left":  (440, 272, 4),   # Row 2 left half: left-facing walk
-    "walk_right": (440, 272, 4),   # Row 2 right half: right-facing walk (offset +4 cells)
-    "idle":       (848, 232, 4),   # Row 3: idle animation
-    "combat":     (1176, 304, 8),  # Row 4: combat sequence
+# Sprite sheet layout (shared by all 2816x1536 character/NPC sheets)
+# Sprites are at irregular positions — define exact bounding boxes per frame.
+# Row Y ranges (y_start, y_end) for each animation row:
+SHEET_ROW_Y = {
+    "walk_fb": (200, 350),   # Row 1: front/back walk
+    "walk_lr": (470, 690),   # Row 2: left/right walk
+    "idle":    (880, 1060),  # Row 3: idle
+    "combat":  (1200, 1460), # Row 4: combat
 }
-# Cell offset for right-half rows (back/right walk start at cell 4)
-SHEET_BACK_OFFSET = 4
-SHEET_RIGHT_OFFSET = 4
+
+# X bounding boxes for walk animation frames (4 frames per direction)
+# Detected from warrior.png — consistent across all sheets
+SHEET_WALK_X = {
+    "down":  [(106, 233), (329, 451), (558, 681), (782, 910)],    # Row 1 first half
+    "up":    [(1455, 1582), (1684, 1806), (1910, 2030), (2131, 2257)],  # Row 1 second half
+    "left":  [(113, 227), (321, 446), (546, 675), (794, 920)],    # Row 2 first half
+    "right": [(1449, 1577), (1666, 1795), (1891, 2023), (2136, 2269)],  # Row 2 second half
+}
+SHEET_WALK_FRAMES = 4
 
 # Tile size (town map)
 TILE_SIZE = 96

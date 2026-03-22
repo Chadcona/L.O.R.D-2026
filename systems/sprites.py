@@ -7,7 +7,7 @@ import os
 from settings import (
     USE_EXTERNAL_SPRITES, PLAYER_SPRITE_W, PLAYER_SPRITE_H,
     CLASS_SPRITE_SHEETS, NPC_SPRITE_SHEETS,
-    SHEET_CELL_W, SHEET_ROWS, SHEET_BACK_OFFSET, SHEET_RIGHT_OFFSET,
+    SHEET_ROW_Y, SHEET_WALK_X, SHEET_WALK_FRAMES,
 )
 
 
@@ -1437,35 +1437,82 @@ def _load_sheet(path):
     return None
 
 
+def _is_bg_color(r, g, b):
+    """Check if a pixel color looks like sheet background (white or grid lines)."""
+    mx = max(r, g, b)
+    mn = min(r, g, b)
+    sat = mx - mn
+    # White/near-white background
+    if mx > 230 and sat < 30:
+        return True
+    # Cool grey grid lines (~140, 150, 155)
+    if 120 < mx < 200 and sat < 30:
+        return True
+    # Warm cream background (old sheet compat)
+    if (r - g) > 20 and (g - b) > 20:
+        return False
+    dr, dg, db = r - 247, g - 244, b - 219
+    if dr * dr + dg * dg + db * db < 1200:
+        return True
+    return False
+
+
 def _remove_background(sprite):
-    """Remove cream/tan background and grid lines using color distance."""
-    for py in range(sprite.get_height()):
-        for px in range(sprite.get_width()):
+    """Remove background using flood-fill from edges.
+
+    Only removes cream/grid pixels that are connected to the cell border.
+    This preserves white clothing, aprons, etc. that are surrounded by
+    sprite pixels.
+    """
+    w, h = sprite.get_size()
+    # Build a mask of candidate background pixels
+    is_bg = [[False] * h for _ in range(w)]
+    for px in range(w):
+        for py in range(h):
             r, g, b, a = sprite.get_at((px, py))
-            if (r - g) > 20 and (g - b) > 20:
-                continue
-            dr, dg, db = r - 247, g - 244, b - 219
-            if dr * dr + dg * dg + db * db < 1600:
-                sprite.set_at((px, py), (0, 0, 0, 0))
-                continue
-            dr, dg, db = r - 192, g - 178, b - 134
-            if dr * dr + dg * dg + db * db < 900:
+            is_bg[px][py] = _is_bg_color(r, g, b)
+
+    # Flood-fill from all border pixels
+    to_clear = [[False] * h for _ in range(w)]
+    stack = []
+    for px in range(w):
+        if is_bg[px][0]:
+            stack.append((px, 0))
+        if is_bg[px][h - 1]:
+            stack.append((px, h - 1))
+    for py in range(h):
+        if is_bg[0][py]:
+            stack.append((0, py))
+        if is_bg[w - 1][py]:
+            stack.append((w - 1, py))
+
+    while stack:
+        px, py = stack.pop()
+        if px < 0 or px >= w or py < 0 or py >= h:
+            continue
+        if to_clear[px][py] or not is_bg[px][py]:
+            continue
+        to_clear[px][py] = True
+        stack.append((px - 1, py))
+        stack.append((px + 1, py))
+        stack.append((px, py - 1))
+        stack.append((px, py + 1))
+
+    # Apply transparency only to flood-filled background pixels
+    for px in range(w):
+        for py in range(h):
+            if to_clear[px][py]:
                 sprite.set_at((px, py), (0, 0, 0, 0))
     return sprite
 
 
-def _extract_cell(sheet, cell_col, row_name, target_w, target_h):
-    """Extract one sprite cell from a sheet and clean its background.
-
-    cell_col: which column (0-7) in the grid
-    row_name: key into SHEET_ROWS for y position and height
-    """
-    row_info = SHEET_ROWS.get(row_name)
-    if not row_info:
+def _extract_sprite(sheet, x_start, x_end, row_name, target_w, target_h):
+    """Extract one sprite from a sheet using exact bounding box coordinates."""
+    row_y = SHEET_ROW_Y.get(row_name)
+    if not row_y:
         return None
-    y_start, row_h, _ = row_info
-    x = cell_col * SHEET_CELL_W
-    rect = pygame.Rect(x, y_start, SHEET_CELL_W, row_h)
+    y_start, y_end = row_y
+    rect = pygame.Rect(x_start, y_start, x_end - x_start, y_end - y_start)
 
     sw, sh = sheet.get_size()
     if rect.right > sw or rect.bottom > sh:
@@ -1483,8 +1530,8 @@ def _extract_cell(sheet, cell_col, row_name, target_w, target_h):
 def get_player_sprite(player_class, facing, frame, hair="brown"):
     """Get a cached player sprite with walk animation frame.
 
-    Each class has its own sprite sheet with 4 walk frames per direction.
-    frame is mod 4 for walk animations.
+    Each class has its own sprite sheet. Exact sprite positions are defined
+    in SHEET_WALK_X with 4 frames per direction (down/up/left/right).
     """
     key = (player_class, facing, frame, hair)
     if key in _sprite_cache:
@@ -1492,25 +1539,18 @@ def get_player_sprite(player_class, facing, frame, hair="brown"):
 
     sprite = None
     if USE_EXTERNAL_SPRITES:
-        # Determine which sheet to load
         all_sheets = {**CLASS_SPRITE_SHEETS, **NPC_SPRITE_SHEETS}
         sheet_path = all_sheets.get(player_class)
         if sheet_path:
             sheet = _load_sheet(sheet_path)
             if sheet:
-                walk_frame = frame % 4
-                if facing == "down":
-                    sprite = _extract_cell(sheet, walk_frame, "walk_front",
-                                           PLAYER_SPRITE_W, PLAYER_SPRITE_H)
-                elif facing == "up":
-                    sprite = _extract_cell(sheet, walk_frame + SHEET_BACK_OFFSET, "walk_back",
-                                           PLAYER_SPRITE_W, PLAYER_SPRITE_H)
-                elif facing == "right":
-                    sprite = _extract_cell(sheet, walk_frame + SHEET_RIGHT_OFFSET, "walk_right",
-                                           PLAYER_SPRITE_W, PLAYER_SPRITE_H)
-                elif facing == "left":
-                    sprite = _extract_cell(sheet, walk_frame, "walk_left",
-                                           PLAYER_SPRITE_W, PLAYER_SPRITE_H)
+                walk_frame = frame % SHEET_WALK_FRAMES
+                x_positions = SHEET_WALK_X.get(facing)
+                if x_positions and walk_frame < len(x_positions):
+                    x_start, x_end = x_positions[walk_frame]
+                    row = "walk_fb" if facing in ("down", "up") else "walk_lr"
+                    sprite = _extract_sprite(sheet, x_start, x_end, row,
+                                             PLAYER_SPRITE_W, PLAYER_SPRITE_H)
 
     if sprite is None:
         sprite = create_player_sprite(player_class, facing, frame, hair)
