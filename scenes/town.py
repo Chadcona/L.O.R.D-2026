@@ -105,12 +105,12 @@ class TownScene(Scene):
 
     def _init_npcs(self):
         npc_defs = [
-            {"tx": 2, "ty": 4, "class": "Thief", "hair": "blonde",
-             "path": [(2, 4), (2, 8), (4, 8), (4, 4)]},
-            {"tx": 15, "ty": 8, "class": "Mage", "hair": "white",
-             "path": [(15, 8), (15, 10), (17, 10), (17, 8)]},
-            {"tx": 9, "ty": 4, "class": "Warrior", "hair": "red",
+            {"tx": 9, "ty": 4, "class": "Seth", "hair": "brown",
              "path": [(9, 4), (9, 8), (10, 8), (10, 4)]},
+            {"tx": 15, "ty": 8, "class": "Violet", "hair": "purple",
+             "path": [(15, 8), (15, 10), (17, 10), (17, 8)]},
+            {"tx": 2, "ty": 4, "class": "Cat", "hair": "orange",
+             "path": [(2, 4), (2, 8), (4, 8), (4, 4)]},
         ]
         self._npc_sprites = []
         for d in npc_defs:

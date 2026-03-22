@@ -22,42 +22,45 @@ SCALE_FACTOR = 1
 FPS = 60
 TITLE = "Legend of the Red Dragon: 16-Bit Edition"
 
-# External sprite sheet
+# External sprite sheets (individual per class)
 USE_EXTERNAL_SPRITES = True
-SPRITE_SHEET_PATH = os.path.join(SPRITES_DIR, "characters.png")
 
-# Sprite sizes (for display — extracted from sheet at full res, then scaled)
+# Sprite sizes (for display)
 PLAYER_SPRITE_W = 80
 PLAYER_SPRITE_H = 120
 BATTLE_SPRITE_W = 192
 BATTLE_SPRITE_H = 288
 ENEMY_SPRITE_SIZE = 288
 
-# Sprite sheet regions: (x, y, w, h) for each class and facing
-# Detected from the 2816x1536 characters.png layout
-# Each class has 3 poses: front (down), side (right), back (up); left = flipped right
-SPRITE_SHEET_REGIONS = {
-    "Warrior": {  # Row 0, left group
-        "down":  (70, 60, 310, 360),
-        "right": (500, 60, 320, 350),
-        "up":    (950, 60, 350, 350),
-    },
-    "Thief": {  # Row 1, left group (labeled "Rogue" on sheet)
-        "down":  (70, 460, 310, 330),
-        "right": (500, 460, 320, 302),
-        "up":    (950, 460, 350, 302),
-    },
-    "Cleric": {  # Row 0, right group
-        "down":  (1500, 60, 320, 360),
-        "right": (1980, 60, 270, 350),
-        "up":    (2400, 60, 320, 350),
-    },
-    "Mage": {  # Row 3, left group
-        "down":  (70, 1170, 310, 360),
-        "right": (500, 1170, 320, 360),
-        "up":    (950, 1170, 350, 360),
-    },
+# Per-class sprite sheet files (all 2816x1536, same grid layout)
+CLASS_SPRITE_SHEETS = {
+    "Warrior": os.path.join(SPRITES_DIR, "warrior.png"),
+    "Thief":   os.path.join(SPRITES_DIR, "Thief.png"),
+    "Mage":    os.path.join(SPRITES_DIR, "mage.png"),
 }
+
+# NPC sprite sheet files (same 2816x1536 grid layout)
+NPC_SPRITE_SHEETS = {
+    "Seth":   os.path.join(SPRITES_DIR, "Sethable Tavern Keeper.png"),
+    "Violet": os.path.join(SPRITES_DIR, "violet tavernmaid mayors daughter.png"),
+    "Cat":    os.path.join(SPRITES_DIR, "town cat neko.png"),
+}
+
+# Sprite sheet grid layout (shared by all character/NPC sheets)
+# All sheets are 2816x1536 with 8 columns of 352px each
+SHEET_CELL_W = 352  # 2816 / 8
+SHEET_ROWS = {
+    # name: (y_start, height, num_frames)
+    "walk_front": (168, 200, 4),   # Row 1 left half: front-facing walk
+    "walk_back":  (168, 200, 4),   # Row 1 right half: back-facing walk (offset +4 cells)
+    "walk_left":  (440, 272, 4),   # Row 2 left half: left-facing walk
+    "walk_right": (440, 272, 4),   # Row 2 right half: right-facing walk (offset +4 cells)
+    "idle":       (848, 232, 4),   # Row 3: idle animation
+    "combat":     (1176, 304, 8),  # Row 4: combat sequence
+}
+# Cell offset for right-half rows (back/right walk start at cell 4)
+SHEET_BACK_OFFSET = 4
+SHEET_RIGHT_OFFSET = 4
 
 # Tile size (town map)
 TILE_SIZE = 96

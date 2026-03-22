@@ -5,8 +5,9 @@
 import pygame
 import os
 from settings import (
-    USE_EXTERNAL_SPRITES, SPRITE_SHEET_PATH,
-    SPRITE_SHEET_REGIONS, PLAYER_SPRITE_W, PLAYER_SPRITE_H,
+    USE_EXTERNAL_SPRITES, PLAYER_SPRITE_W, PLAYER_SPRITE_H,
+    CLASS_SPRITE_SHEETS, NPC_SPRITE_SHEETS,
+    SHEET_CELL_W, SHEET_ROWS, SHEET_BACK_OFFSET, SHEET_RIGHT_OFFSET,
 )
 
 
@@ -1416,98 +1417,106 @@ def create_roof_surface(width, height, color=(180, 60, 50)):
     return surf
 
 
-# --- Sprite cache ---
+# --- Sprite cache & per-class sheet loading ---
 _sprite_cache = {}
-_external_sheet = None
+_sheet_cache = {}  # path -> loaded Surface
 
 
-def _load_external_sheet():
-    """Load the external sprite sheet if it exists and is enabled."""
-    global _external_sheet
-    if not USE_EXTERNAL_SPRITES:
-        return None
-    if _external_sheet is not None:
-        return _external_sheet
-
-    if os.path.exists(SPRITE_SHEET_PATH):
+def _load_sheet(path):
+    """Load and cache a sprite sheet by file path."""
+    if path in _sheet_cache:
+        return _sheet_cache[path]
+    if os.path.exists(path):
         try:
-            _external_sheet = pygame.image.load(SPRITE_SHEET_PATH).convert_alpha()
-            return _external_sheet
+            sheet = pygame.image.load(path).convert_alpha()
+            _sheet_cache[path] = sheet
+            return sheet
         except pygame.error:
-            print(f"Error: Could not load sprite sheet at {SPRITE_SHEET_PATH}")
+            print(f"Error: Could not load sprite sheet at {path}")
+    _sheet_cache[path] = None
     return None
 
 
-def _extract_sheet_sprite(sheet, player_class, facing):
-    """Extract a single sprite from the external sprite sheet.
+def _remove_background(sprite):
+    """Remove cream/tan background and grid lines using color distance."""
+    for py in range(sprite.get_height()):
+        for px in range(sprite.get_width()):
+            r, g, b, a = sprite.get_at((px, py))
+            if (r - g) > 20 and (g - b) > 20:
+                continue
+            dr, dg, db = r - 247, g - 244, b - 219
+            if dr * dr + dg * dg + db * db < 1600:
+                sprite.set_at((px, py), (0, 0, 0, 0))
+                continue
+            dr, dg, db = r - 192, g - 178, b - 134
+            if dr * dr + dg * dg + db * db < 900:
+                sprite.set_at((px, py), (0, 0, 0, 0))
+    return sprite
 
-    Uses explicit pixel regions defined in SPRITE_SHEET_REGIONS (settings.py).
-    Each class has 3 poses: front (down), side (right), back (up).
-    Left facing is the right pose flipped horizontally.
+
+def _extract_cell(sheet, cell_col, row_name, target_w, target_h):
+    """Extract one sprite cell from a sheet and clean its background.
+
+    cell_col: which column (0-7) in the grid
+    row_name: key into SHEET_ROWS for y position and height
     """
-    class_regions = SPRITE_SHEET_REGIONS.get(player_class)
-    if not class_regions:
+    row_info = SHEET_ROWS.get(row_name)
+    if not row_info:
         return None
-
-    lookup_facing = "right" if facing == "left" else facing
-    region = class_regions.get(lookup_facing)
-    if not region:
-        return None
-
-    x, y, w, h = region
-    rect = pygame.Rect(x, y, w, h)
+    y_start, row_h, _ = row_info
+    x = cell_col * SHEET_CELL_W
+    rect = pygame.Rect(x, y_start, SHEET_CELL_W, row_h)
 
     sw, sh = sheet.get_size()
     if rect.right > sw or rect.bottom > sh:
         return None
-
     try:
         sprite = sheet.subsurface(rect).copy()
         sprite = sprite.convert_alpha()
-        # Remove cream/tan background and grid lines — the sheet has many
-        # slightly different shades of warm cream. Use color distance from
-        # two reference colors (light cream and darker grid lines).
-        for py in range(sprite.get_height()):
-            for px in range(sprite.get_width()):
-                r, g, b, a = sprite.get_at((px, py))
-                # Skip warm saturated colors (skin tones, leather, etc.)
-                if (r - g) > 20 and (g - b) > 20:
-                    continue
-                # Check distance from cream background (~247, 244, 219)
-                dr, dg, db = r - 247, g - 244, b - 219
-                if dr * dr + dg * dg + db * db < 1600:
-                    sprite.set_at((px, py), (0, 0, 0, 0))
-                    continue
-                # Check distance from grid lines (~192, 178, 134)
-                dr, dg, db = r - 192, g - 178, b - 134
-                if dr * dr + dg * dg + db * db < 900:
-                    sprite.set_at((px, py), (0, 0, 0, 0))
-        # Scale to game display size
-        sprite = pygame.transform.smoothscale(sprite, (PLAYER_SPRITE_W, PLAYER_SPRITE_H))
-        if facing == "left":
-            sprite = pygame.transform.flip(sprite, True, False)
+        _remove_background(sprite)
+        sprite = pygame.transform.smoothscale(sprite, (target_w, target_h))
         return sprite
     except ValueError:
         return None
 
 
 def get_player_sprite(player_class, facing, frame, hair="brown"):
-    """Get a cached player sprite (external or procedural)."""
+    """Get a cached player sprite with walk animation frame.
+
+    Each class has its own sprite sheet with 4 walk frames per direction.
+    frame is mod 4 for walk animations.
+    """
     key = (player_class, facing, frame, hair)
     if key in _sprite_cache:
         return _sprite_cache[key]
 
-    # Try loading from external sheet first
-    sheet = _load_external_sheet()
-    if sheet:
-        sprite = _extract_sheet_sprite(sheet, player_class, facing)
-        if sprite:
-            _sprite_cache[key] = sprite
-            return _sprite_cache[key]
+    sprite = None
+    if USE_EXTERNAL_SPRITES:
+        # Determine which sheet to load
+        all_sheets = {**CLASS_SPRITE_SHEETS, **NPC_SPRITE_SHEETS}
+        sheet_path = all_sheets.get(player_class)
+        if sheet_path:
+            sheet = _load_sheet(sheet_path)
+            if sheet:
+                walk_frame = frame % 4
+                if facing == "down":
+                    sprite = _extract_cell(sheet, walk_frame, "walk_front",
+                                           PLAYER_SPRITE_W, PLAYER_SPRITE_H)
+                elif facing == "up":
+                    sprite = _extract_cell(sheet, walk_frame + SHEET_BACK_OFFSET, "walk_back",
+                                           PLAYER_SPRITE_W, PLAYER_SPRITE_H)
+                elif facing == "right":
+                    sprite = _extract_cell(sheet, walk_frame + SHEET_RIGHT_OFFSET, "walk_right",
+                                           PLAYER_SPRITE_W, PLAYER_SPRITE_H)
+                elif facing == "left":
+                    sprite = _extract_cell(sheet, walk_frame, "walk_left",
+                                           PLAYER_SPRITE_W, PLAYER_SPRITE_H)
 
-    # Fallback to procedural generation
-    _sprite_cache[key] = create_player_sprite(player_class, facing, frame, hair)
-    return _sprite_cache[key]
+    if sprite is None:
+        sprite = create_player_sprite(player_class, facing, frame, hair)
+
+    _sprite_cache[key] = sprite
+    return sprite
 
 
 def get_enemy_sprite(name, sprite_color, size=48):
